@@ -1,0 +1,19 @@
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v3
+
+      - name: Placeholder Lint
+        run: echo "Linting all layers..." && exit 0
+
+      - name: Placeholder Test
+        run: echo "Testing all layers..." && exit 0
