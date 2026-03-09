@@ -1,15 +1,6 @@
-# Node
 node_modules/
 dist/
-
-# Python
-__pycache__/
-*.pyc
-venv/
-
-# Env
+build/
 .env
-.env.local
-
-# OS
 .DS_Store
+coverage/

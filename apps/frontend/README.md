@@ -1,12 +1,3 @@
-# Frontend (Presentation Layer)
+# Frontend
 
-Responsibilities:
-- Provide the user interface for GoalPilot.
-- Consume REST APIs based on `docs/api-contract/openapi.yaml`.
-- Listen to realtime events (`soft_lock.updated`, `goal_plan.updated`) over WebSocket/AppSync.
-
-Local Dev (Placeholder):
-```bash
-npm install
-npm run dev
-```
+Khung cho mobile hoặc web frontend.

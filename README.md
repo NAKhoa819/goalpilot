@@ -1,26 +1,13 @@
 # GoalPilot
 
-A 4-layer agentic finance application:
-1. **Presentation Layer (UI)**: `apps/frontend/`
-2. **API & Logic Layer (API Gateway + Lambda)**: `apps/backend-api-logic/`
-3. **Intelligence Layer (Agentic Reasoning)**: `apps/backend-intelligence/`
-4. **Data Layer (External Context/Forecasts)**: `apps/backend-data/`
+Monorepo skeleton project.
 
-## Components
-- **apps/frontend**: The presentation layer providing the user interface.
-- **apps/backend-api-logic** (BE#1): Data ingestion and user context persistence.
-- **apps/backend-intelligence** (BE#2): Agentic reasoning boundary with Bedrock Claude, prompt management, RAG glue, and decision tree mapping.
-- **apps/backend-data** (BE#3): Market data collection and forecasting service boundary.
-
-## Development Workflow (Contract-First)
-We use a contract-first approach. The frontend can be built concurrently with the backends using mock data based on our OpenAPI specification and Realtime Event definitions:
-- **REST API Specs**: See `docs/api-contract/openapi.yaml`
-- **Realtime Events**: See `docs/api-contract/events.md`
-- **Shared Types**: See `packages/shared-types/README.md`
-
-## Running Locally (Placeholders)
-To run the full stack locally:
-1. Run Frontend: `cd apps/frontend && npm run dev`
-2. Run BE#1: `cd apps/backend-api-logic && npm run dev`
-3. Run BE#2: `cd apps/backend-intelligence && npm run dev`
-4. Run BE#3: `cd apps/backend-data && npm run dev`
+## Cấu trúc thư mục:
+- `apps/backend/`: chứa các service backend của dự án.
+  - `input/`: khung cho phần tiếp nhận dữ liệu đầu vào như manual entry, SMS reading, OCR ingestion.
+  - `intelligence/`: khung cho forecasting, reasoning, recommendation, và AI-related logic.
+  - `data/`: khung cho data access, persistence, database interaction, và external data provider integration nếu sau này cần.
+- `apps/frontend/`: khung cho mobile/web frontend.
+- `docs/`: để tài liệu dự án.
+- `infra/`: để deployment/configuration/docker về sau.
+- `packages/`: để shared package hoặc shared types nếu sau này cần.
