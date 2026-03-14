@@ -11,6 +11,7 @@ export { getDashboard } from './dashboardCoordinator';
 export { getGoalProgress, createGoal } from './goalCoordinator';
 export { postChatMessage, getChatSession } from './chatCoordinator';
 export { postInputData } from './inputDataCoordinator';
+export { getCashFlow } from './cashFlowCoordinator';
 
 // --- Types ---
 export type {
@@ -61,6 +62,9 @@ export type {
   InputDataRequest,
   InputDataData,
   InputDataResponse,
+  CashFlowPoint,
+  CashFlowData,
+  CashFlowResponse,
 } from './types';
 
 // --- Mock data (optional, dùng cho testing / Storybook) ---
@@ -72,4 +76,5 @@ export {
   MOCK_CHAT_SESSION,
   MOCK_CREATE_GOAL,
   MOCK_INPUT_DATA,
+  MOCK_CASH_FLOW,
 } from './mockData';

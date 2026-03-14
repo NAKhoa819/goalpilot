@@ -14,7 +14,7 @@ Dashboard hiện có 3 vùng chính:
 2. Chat preview, bấm vào để sang tab Agent
 3. Nút nhập dữ liệu
 
-Contract hiện chốt theo 6 endpoint:
+Contract hiện chốt theo 7 endpoint:
 
 - `GET /api/dashboard`
 - `GET /api/goals/{goal_id}/progress`
@@ -22,6 +22,7 @@ Contract hiện chốt theo 6 endpoint:
 - `GET /api/chat/session/{session_id}`
 - `POST /api/goals`
 - `POST /api/input-data`
+- `GET /api/cashflow/weekly`
 
 ---
 
@@ -758,6 +759,71 @@ Nhập dữ liệu từ dashboard.
 ## FE usage
 - Thông báo nhập dữ liệu thành công/thất bại
 - Nếu `should_refresh_dashboard = true` thì gọi lại dashboard
+
+---
+
+# 4.7 GET /api/cashflow/weekly
+
+## Purpose
+Lấy dữ liệu dòng tiền (income / expense) trong **7 ngày gần nhất** để render biểu đồ Cash Flow trên dashboard.
+
+## Query params
+| Param | Type | Required | Description | Example |
+|---|---|---:|---|---|
+| `goal_id` | string | No | Lọc dữ liệu theo goal cụ thể | `g001` |
+
+## Request
+Không có request body.
+
+## Response schema
+
+### data fields
+| Field | Type | Required | Description |
+|---|---|---:|---|
+| `period_start` | date | Yes | Ngày đầu tuần (YYYY-MM-DD) |
+| `period_end` | date | Yes | Ngày cuối tuần (YYYY-MM-DD) |
+| `points` | array\<object\> | Yes | Dữ liệu dòng tiền từng ngày |
+
+### points item (CashFlowPoint)
+| Field | Type | Required | Description | Example |
+|---|---|---:|---|---|
+| `date` | date | Yes | Ngày cụ thể | `2026-03-08` |
+| `income` | number | Yes | Tổng thu trong ngày | `3000000` |
+| `expense` | number | Yes | Tổng chi trong ngày | `750000` |
+| `net` | number | Yes | income − expense (tính sẵn) | `2250000` |
+
+## Example response
+```json
+{
+  "success": true,
+  "data": {
+    "period_start": "2026-03-08",
+    "period_end": "2026-03-14",
+    "points": [
+      { "date": "2026-03-08", "income": 0,       "expense": 320000, "net": -320000 },
+      { "date": "2026-03-09", "income": 3000000, "expense": 750000, "net": 2250000 },
+      { "date": "2026-03-10", "income": 0,       "expense": 480000, "net": -480000 },
+      { "date": "2026-03-11", "income": 500000,  "expense": 200000, "net":  300000 },
+      { "date": "2026-03-12", "income": 0,       "expense": 650000, "net": -650000 },
+      { "date": "2026-03-13", "income": 4000000, "expense": 900000, "net": 3100000 },
+      { "date": "2026-03-14", "income": 0,       "expense": 410000, "net": -410000 }
+    ]
+  }
+}
+```
+
+## Error cases
+| error_code | Meaning |
+|---|---|
+| `INVALID_GOAL_ID` | goal_id không hợp lệ |
+| `NO_DATA_AVAILABLE` | Chưa có dữ liệu giao dịch trong tuần |
+
+## FE usage
+- Render biểu đồ cột / đường theo `points`
+- Trục X: `date` (hiển thị ngày trong tuần, ví dụ T2, T3…)
+- Trục Y: giá trị VND
+- Vẽ 2 series: `income` (xanh) và `expense` (đỏ), hoặc dùng `net` cho line chart
+- Hiển thị `period_start` → `period_end` làm tiêu đề tuần
 
 ---
 

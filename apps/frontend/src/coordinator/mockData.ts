@@ -10,6 +10,7 @@ import type {
   ChatSessionData,
   CreateGoalData,
   InputDataData,
+  CashFlowData,
 } from './types';
 
 // ----------------------------------------------------------
@@ -236,4 +237,22 @@ export const MOCK_INPUT_DATA: InputDataData = {
   imported_count: 1,
   affected_goals: ['g001', 'g002'],
   should_refresh_dashboard: true,
+};
+
+// ----------------------------------------------------------
+// Mock: GET /api/cashflow/weekly
+// Dữ liệu dòng tiền 7 ngày (08/03 – 14/03/2026)
+// ----------------------------------------------------------
+export const MOCK_CASH_FLOW: CashFlowData = {
+  period_start: '2026-03-08',
+  period_end: '2026-03-14',
+  points: [
+    { date: '2026-03-08', income: 0,         expense: 320_000, net: -320_000 },
+    { date: '2026-03-09', income: 3_000_000, expense: 750_000, net: 2_250_000 },
+    { date: '2026-03-10', income: 0,         expense: 480_000, net: -480_000 },
+    { date: '2026-03-11', income: 500_000,   expense: 200_000, net:  300_000 },
+    { date: '2026-03-12', income: 0,         expense: 650_000, net: -650_000 },
+    { date: '2026-03-13', income: 4_000_000, expense: 900_000, net: 3_100_000 },
+    { date: '2026-03-14', income: 0,         expense: 410_000, net: -410_000 },
+  ],
 };

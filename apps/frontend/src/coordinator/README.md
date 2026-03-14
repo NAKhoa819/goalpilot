@@ -16,6 +16,7 @@ coordinator/
 ├── goalCoordinator.ts       ← GET /api/goals/{id}/progress, POST /api/goals
 ├── chatCoordinator.ts       ← POST /api/chat/message, GET /api/chat/session/{id}
 ├── inputDataCoordinator.ts  ← POST /api/input-data
+├── cashFlowCoordinator.ts   ← GET /api/cashflow/weekly
 └── index.ts               ← Re-export tất cả (entry point duy nhất)
 ```
 
@@ -33,9 +34,10 @@ import {
   postChatMessage,
   getChatSession,
   postInputData,
+  getCashFlow,
 } from '@/coordinator';                    // hoặc './coordinator'
 
-import type { GoalCard, DashboardResponse } from '@/coordinator';
+import type { GoalCard, DashboardResponse, CashFlowData } from '@/coordinator';
 ```
 
 ---
@@ -104,6 +106,20 @@ const res = await postInputData({
 });
 if (res.success && res.data.should_refresh_dashboard) {
   // gọi lại getDashboard()
+}
+```
+
+### GET /api/cashflow/weekly
+```ts
+// Lấy dữ liệu dòng tiền 7 ngày gần nhất (không lọc theo goal)
+const res = await getCashFlow();
+
+// Hoặc lọc theo goal cụ thể
+const res = await getCashFlow('g001');
+
+if (res.success) {
+  const { period_start, period_end, points } = res.data;
+  // points: CashFlowPoint[] — mỷi phần tử có { date, income, expense, net }
 }
 ```
 

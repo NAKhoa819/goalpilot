@@ -249,3 +249,23 @@ export interface InputDataData {
   should_refresh_dashboard: boolean;
 }
 export type InputDataResponse = ApiResponse<InputDataData>;
+
+// ----------------------------------------------------------
+// 3.9 CashFlowPoint — điểm dữ liệu dòng tiền mỗi ngày
+// ----------------------------------------------------------
+export interface CashFlowPoint {
+  date: string;    // YYYY-MM-DD
+  income: number;  // Tổng thu trong ngày
+  expense: number; // Tổng chi trong ngày
+  net: number;     // income - expense (tính sẵn)
+}
+
+// ----------------------------------------------------------
+// 4.7 GET /api/cashflow/weekly
+// ----------------------------------------------------------
+export interface CashFlowData {
+  period_start: string; // YYYY-MM-DD — ngày đầu tuần
+  period_end: string;   // YYYY-MM-DD — ngày cuối tuần
+  points: CashFlowPoint[];
+}
+export type CashFlowResponse = ApiResponse<CashFlowData>;
