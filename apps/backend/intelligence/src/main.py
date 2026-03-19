@@ -2,7 +2,7 @@ import os
 import json
 from config import settings
 from core.llm_gateway import get_completion
-from core.intelligence import calculate_sustainability_index, determine_strategy
+from core.intelligence import calculate_metrics, determine_strategy
 from core.prompts import build_system_prompt
 from memory.retriever import ContextRetriever
 from memory.history import ConversationHistory
@@ -24,10 +24,13 @@ def main():
     }
     
     # 2. Intelligence Logic (Calculate S_i and select strategy)
-    s_i = calculate_sustainability_index(user_context, market_context)
+    metrics = calculate_metrics(user_context)
+    s_i = metrics["s_i"]
+    c_s = metrics["c_s"]
     strategy = determine_strategy(s_i)
     
     print(f"\n[Intelligence] Calculated S_i: {s_i:.2f}")
+    print(f"[Intelligence] Calculated C_s: {c_s:.2f}")
     print(f"[Intelligence] Triggered Strategy: {strategy}")
     
     if strategy == "None":
@@ -50,9 +53,7 @@ def main():
     
     response = get_completion(
         messages=messages,
-        response_format=StrategyResponse,
-        user_context=user_context,
-        market_context=market_context
+        response_format=StrategyResponse
     )
     
     # Parse output 

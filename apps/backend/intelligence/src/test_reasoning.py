@@ -29,39 +29,52 @@ def run_test():
         {"role": "user", "content": "I need help with my finances. I spend too much and want to save for retirement."}
     ]
     
-    # Test Gemini
-    print("\n--- Testing Gemini ---")
-    try:
-        gemini_response = get_completion(
-            messages=messages,
-            response_format=StrategyResponse,
-            provider="gemini"
-        )
-        print("Gemini Remediation Steps:")
-        for step in gemini_response.remediation_steps:
-            print(f"- {step}")
-    except Exception as e:
-        print(f"Gemini Test Failed: {e}")
+    # # Test Gemini
+    # print("\n--- Testing Gemini ---")
+    # try:
+    #     gemini_response = get_completion(
+    #         messages=messages,
+    #         response_format=StrategyResponse,
+    #         provider="gemini"
+    #     )
+    #     print("Gemini Remediation Steps:")
+    #     for step in gemini_response.remediation_steps:
+    #         print(f"- {step}")
+    # except Exception as e:
+    #     print(f"Gemini Test Failed: {e}")
         
-    # Test Llama 4
-    print("\n--- Testing Llama 4 (via Groq) ---")
-    try:
-        # Check if API key is present
-        if not os.getenv("GROQ_API_KEY"):
-            print("WARNING: GROQ_API_KEY environment variable is missing!")
-            print("Please add it to your .env file to run this test successfully.")
-            return
+    # # Test Llama 4
+    # print("\n--- Testing llama-3.3-70b-versatile (via Groq) ---")
+    # try:
+    #     # Check if API key is present
+    #     if not os.getenv("GROQ_API_KEY"):
+    #         print("WARNING: GROQ_API_KEY environment variable is missing!")
+    #         print("Please add it to your .env file to run this test successfully.")
+    #         return
 
-        llama_response = get_completion(
+    #     llama_response = get_completion(
+    #         messages=messages,
+    #         response_format=StrategyResponse,
+    #         provider="llama-3.3-70b-versatile"
+    #     )
+    #     print("llama-3.3-70b-versatile Remediation Steps:")
+    #     for step in llama_response.remediation_steps:
+    #         print(f"- {step}")
+    # except Exception as e:
+    #     print(f"llama-3.3-70b-versatile Test Failed: {e}")
+
+
+
+    try:
+        response = get_completion(
             messages=messages,
-            response_format=StrategyResponse,
-            provider="llama4"
+            response_format=StrategyResponse
         )
-        print("Llama 4 Remediation Steps:")
-        for step in llama_response.remediation_steps:
+        print("Agent Remediation Steps:")
+        for step in response.remediation_steps:
             print(f"- {step}")
     except Exception as e:
-        print(f"Llama 4 Test Failed: {e}")
+        print(f"Agent Test Failed: {e}")
 
 if __name__ == "__main__":
     run_test()
