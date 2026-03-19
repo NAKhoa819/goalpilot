@@ -24,16 +24,20 @@ def get_model(provider: str = None):
         
         if backup_provider == "groq":
             from langchain_groq import ChatGroq
-            return ChatGroq(model=backup_model, temperature=0.0)
+            return ChatGroq(model=backup_model, temperature=0.7)
         elif backup_provider == "gemini":
             from langchain_google_genai import ChatGoogleGenerativeAI
-            return ChatGoogleGenerativeAI(model=backup_model, temperature=0.0)
+            return ChatGoogleGenerativeAI(model=backup_model, temperature=0.7)
         elif backup_provider == "mock":
             return "mock"
         else:
             raise ValueError(f"Unsupported backup provider: {backup_provider}")
     else:
         raise ValueError(f"Unsupported provider: {selected_provider}")
+    
+    #Note: Temperature range [0.0, 1.0]
+    #towards 1 give more diverse and creative responses
+    #towards 0 give more deterministic and focused responses
 
 def get_completion(messages: list, response_format=None, provider=None):
     """
