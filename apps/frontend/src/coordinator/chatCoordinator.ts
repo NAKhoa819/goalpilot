@@ -35,7 +35,7 @@ export async function postChatMessage(
       session_id: payload.session_id,
       reply: {
         ...MOCK_CHAT_REPLY.reply,
-        // Echo user message context vào reply text để dễ debug
+        message_id: `m_${Date.now()}`, // unique mỗi lần — tránh duplicate key
         text: MOCK_CHAT_REPLY.reply.text,
       },
     },

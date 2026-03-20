@@ -23,11 +23,32 @@ export interface ApiErrorResponse {
 // ----------------------------------------------------------
 export type GoalStatus = 'on_track' | 'at_risk' | 'completed' | 'paused';
 export type WarningLevel = 'info' | 'warning' | 'critical';
+/**
+ * Strategy BE chọn sau khi phân tích:
+ *   A = Cost optimization / cắt chi tiêu
+ *   B = Goal adjustment / gia hạn deadline hoặc tăng thu nhập
+ * Lưu ý: FE luôn hiện CẢ 2 nút plan_a + plan_b khi gap_detected = true.
+ * strategy_selected chỉ dùng để highlight nút BE recommend.
+ */
 export type StrategySelected = 'A' | 'B';
 export type InputSource = 'manual' | 'ocr' | 'sms' | 'file';
 export type GoalType = 'purchase' | 'saving' | 'emergency_fund' | 'custom';
 export type ChatRole = 'user' | 'assistant';
-export type ChatActionType = string;
+
+/**
+ * Action type trong chat. plan_a + plan_b luôn xuất hiện cùng nhau
+ * trong 1 reply khi agent phát hiện gap (gap_detected = true).
+ */
+export type ChatActionType =
+  | 'plan_a'             // Tăng tiết kiệm hàng tháng
+  | 'plan_b'             // Gia hạn deadline
+  | 'create_goal'        // Tạo goal mới
+  | 'view_goal_progress' // Mở chi tiết tiến trình goal
+  | 'open_input_data'    // Mở form nhập liệu
+  | 'refresh_dashboard'  // Refresh dashboard
+  | 'accept'             // Đồng ý lộ trình
+  | 'cancel'             // Huỷ
+  | (string & {});       // Fallback — không mất type-narrowing
 export type GapReason =
   | 'market_price_increase'
   | 'overspending'
@@ -59,10 +80,26 @@ export interface ChatPreview {
 // ----------------------------------------------------------
 // 3.3 ChatAction — action button trong chat
 // ----------------------------------------------------------
+
+/** Payload Plan A: tăng tiết kiệm hàng tháng */
+export interface PlanAPayload {
+  strategy: 'increase_savings';
+  amount: number;           // VND tăng thêm mỗi tháng
+  duration_months?: number;
+}
+
+/** Payload Plan B: gia hạn deadline */
+export interface PlanBPayload {
+  strategy: 'extend_deadline';
+  months: number;           // Số tháng gia hạn
+  new_target_date?: string; // YYYY-MM-DD (optional, tính sẵn)
+}
+
 export interface ChatAction {
   type: ChatActionType;
   label: string;
-  payload: Record<string, unknown>;
+  /** plan_a → PlanAPayload | plan_b → PlanBPayload | khác → Record */
+  payload: PlanAPayload | PlanBPayload | Record<string, unknown>;
 }
 
 // ----------------------------------------------------------
@@ -91,6 +128,12 @@ export interface RecommendationOptions {
   recommended_actions: string[];
   deadline_extension_option?: DeadlineExtensionOption;
   income_augmentation_option?: IncomeAugmentationOption;
+  /**
+   * Khi gap_detected = true, BE điền đủ cả 2 field để FE render
+   * 2 nút Plan A + Plan B trong cùng 1 chat reply.
+   */
+  plan_a_option?: PlanAPayload; // data cho nút Plan A
+  plan_b_option?: PlanBPayload; // data cho nút Plan B
 }
 
 // ----------------------------------------------------------
