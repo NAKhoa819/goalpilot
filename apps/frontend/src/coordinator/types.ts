@@ -25,9 +25,9 @@ export type GoalStatus = 'on_track' | 'at_risk' | 'completed' | 'paused';
 export type WarningLevel = 'info' | 'warning' | 'critical';
 /**
  * Strategy BE chọn dựa trên chỉ số Si (Sustainability Index):
- *   Si < 0.4  → B (Goal Realignment)
- *   0.4 ≤ Si < 0.6 → A (Cost Optimization)
- *   Si ≥ 0.6  → None (ổn định, không cần action)
+ *   Si < 0.5  → B (Goal Realignment)
+ *   0.5 ≤ Si < 0.8 → A (Cost Optimization)
+ *   Si ≥ 0.8  → None (ổn định, không cần action)
  */
 export type StrategySelected = 'A' | 'B' | 'None';
 
@@ -43,8 +43,8 @@ export type ChatRole = 'user' | 'assistant';
 
 /**
  * Action type trong chat.
- * 'A' = Cost Optimization button (Si 0.4–0.6)
- * 'B' = Goal Re-alignment button (Si < 0.4)
+ * 'A' = Cost Optimization button (Si 0.5–0.8)
+ * 'B' = Goal Re-alignment button (Si < 0.5)
  */
 export type ChatActionType =
   | 'A'                  // Cost Optimization
