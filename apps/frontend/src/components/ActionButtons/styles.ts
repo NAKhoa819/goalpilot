@@ -13,10 +13,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   bigRow: { flexDirection: 'row', gap: 10 },
+
+  // overflow: 'visible' cho phép quầng sáng Neon tỏa ra ngoài viền tấm kính
   bigBtn: {
     width: BTN_W,
     borderRadius: 20,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   bigBtnCard: {
     borderRadius: 20,
@@ -25,7 +27,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     paddingHorizontal: 10,
     gap: 8,
-    borderWidth: 1,
+    // backgroundColor và borderWidth được truyền qua inline style từ component
   },
   bigLetter: {
     fontFamily: FONT_EXTRABOLD,
@@ -38,23 +40,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 4,
   },
+
   pillRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  pillBtn:  { borderRadius: 16, overflow: 'hidden' },
+
+  // overflow: 'visible' cho nút pill để glow không bị clip
+  pillBtn: {
+    borderRadius: 16,
+    overflow: 'visible',
+    // Neon shadow được truyền từ LiquidGlassView inline style
+    shadowColor: COLORS.neonYellow,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 2,
+  },
   pillInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    backgroundColor: COLORS.bgCardAlt,
+    // backgroundColor xóa — truyền qua inline style (rgba cực trong suốt)
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: COLORS.neonYellow,
-    shadowColor: COLORS.neonYellow,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 5,
-    elevation: 2,
+    // borderColor truyền qua inline style
   },
   pillLabel: {
     fontFamily: FONT_BOLD,

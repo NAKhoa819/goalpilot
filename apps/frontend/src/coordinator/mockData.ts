@@ -11,6 +11,7 @@ import type {
   CreateGoalData,
   InputDataData,
   CashFlowData,
+  StrategyResponse,
 } from './types';
 
 // ----------------------------------------------------------
@@ -166,17 +167,31 @@ export const MOCK_GOAL_PROGRESS_MAP: Record<string, GoalProgressData> = {
 };
 
 // ----------------------------------------------------------
-// Mock: POST /api/chat/message
+// Mock: StrategyResponse từ BE (phân tích Si)
+// ----------------------------------------------------------
+export const MOCK_STRATEGY_RESPONSE: StrategyResponse = {
+  strategy: 'A',
+  reasoning:
+    'Chỉ số bền vững (Si = 0.52) cho thấy mục tiêu Mua Laptop có nguy cơ trễ hạn. ' +
+    'Chi tiêu tháng này vượt kế hoạch 1.5 triệu đồng, chủ yếu ở danh mục ăn uống và giải trí.',
+  remediation_steps: [
+    'Giảm chi tiêu ăn uống ngoài xuống còn 2,000,000 đ/tháng',
+    'Tạm hoãn các khoản mua sắm không thiết yếu trong 60 ngày',
+    'Tăng khoản tiết kiệm tự động thêm 500,000 đ/tháng',
+  ],
+};
+
+// ----------------------------------------------------------
+// Mock: POST /api/chat/message  (derived from MOCK_STRATEGY_RESPONSE)
 // ----------------------------------------------------------
 export const MOCK_CHAT_REPLY: ChatMessageData = {
   session_id: 's001',
   reply: {
     message_id: 'm005',
     role: 'assistant',
-    text: 'Cảnh báo: Mục tiêu Mua Laptop đang chậm tiến độ do tháng này bạn chi tiêu lố. Bạn muốn điều chỉnh lộ trình như thế nào?',
+    text: 'Cảnh báo: Mục tiêu Mua Laptop đang có nguy cơ trễ hạn. Đề xuất tối ưu chi tiêu.',
     actions: [
-      { type: 'plan_a', label: 'Plan A — Tăng 3tr/tháng', payload: { strategy: 'increase_savings', amount: 3000000 } },
-      { type: 'plan_b', label: 'Plan B — Dời hạn thêm 2 tháng', payload: { strategy: 'extend_deadline', months: 2 } }
+      { type: 'A', label: 'Cost Optimization', payload: {} },
     ],
   },
 };

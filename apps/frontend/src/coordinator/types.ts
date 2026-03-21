@@ -24,24 +24,31 @@ export interface ApiErrorResponse {
 export type GoalStatus = 'on_track' | 'at_risk' | 'completed' | 'paused';
 export type WarningLevel = 'info' | 'warning' | 'critical';
 /**
- * Strategy BE chọn sau khi phân tích:
- *   A = Cost optimization / cắt chi tiêu
- *   B = Goal adjustment / gia hạn deadline hoặc tăng thu nhập
- * Lưu ý: FE luôn hiện CẢ 2 nút plan_a + plan_b khi gap_detected = true.
- * strategy_selected chỉ dùng để highlight nút BE recommend.
+ * Strategy BE chọn dựa trên chỉ số Si (Sustainability Index):
+ *   Si < 0.4  → B (Goal Realignment)
+ *   0.4 ≤ Si < 0.6 → A (Cost Optimization)
+ *   Si ≥ 0.6  → None (ổn định, không cần action)
  */
-export type StrategySelected = 'A' | 'B';
+export type StrategySelected = 'A' | 'B' | 'None';
+
+/** Payload trả về từ BE sau khi phân tích Si */
+export interface StrategyResponse {
+  strategy: StrategySelected;
+  reasoning: string;
+  remediation_steps: string[];
+}
 export type InputSource = 'manual' | 'ocr' | 'sms' | 'file';
 export type GoalType = 'purchase' | 'saving' | 'emergency_fund' | 'custom';
 export type ChatRole = 'user' | 'assistant';
 
 /**
- * Action type trong chat. plan_a + plan_b luôn xuất hiện cùng nhau
- * trong 1 reply khi agent phát hiện gap (gap_detected = true).
+ * Action type trong chat.
+ * 'A' = Cost Optimization button (Si 0.4–0.6)
+ * 'B' = Goal Re-alignment button (Si < 0.4)
  */
 export type ChatActionType =
-  | 'plan_a'             // Tăng tiết kiệm hàng tháng
-  | 'plan_b'             // Gia hạn deadline
+  | 'A'                  // Cost Optimization
+  | 'B'                  // Goal Re-alignment
   | 'create_goal'        // Tạo goal mới
   | 'view_goal_progress' // Mở chi tiết tiến trình goal
   | 'open_input_data'    // Mở form nhập liệu

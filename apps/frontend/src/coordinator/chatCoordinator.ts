@@ -9,8 +9,32 @@ import type {
   ChatMessageResponse,
   ChatSessionResponse,
   ChatAction,
+  StrategyResponse,
 } from './types';
-import { MOCK_CHAT_REPLY, MOCK_CHAT_SESSION } from './mockData';
+import { MOCK_STRATEGY_RESPONSE, MOCK_CHAT_SESSION } from './mockData';
+
+// ---------------------------------------------------------------------------
+// Transform StrategyResponse → ChatMessage text + actions array
+// ---------------------------------------------------------------------------
+function buildChatReplyFromStrategy(sr: StrategyResponse): {
+  text: string;
+  actions: ChatAction[];
+} {
+  // Nối reasoning + bullet points từ remediation_steps
+  const bulletList = sr.remediation_steps.map((s) => `• ${s}`).join('\n');
+  const text = `${sr.reasoning}\n\n${bulletList}`;
+
+  // Map strategy → action button(s)
+  let actions: ChatAction[] = [];
+  if (sr.strategy === 'A') {
+    actions = [{ type: 'A', label: 'Cost Optimization', payload: {} }];
+  } else if (sr.strategy === 'B') {
+    actions = [{ type: 'B', label: 'Goal Re-alignment', payload: {} }];
+  }
+  // strategy === 'None' → actions = [] (không hiện nút)
+
+  return { text, actions };
+}
 
 /**
  * Gửi tin nhắn user cho agent và nhận reply.
@@ -21,7 +45,9 @@ import { MOCK_CHAT_REPLY, MOCK_CHAT_SESSION } from './mockData';
  *     headers: { 'Content-Type': 'application/json' },
  *     body: JSON.stringify(payload),
  *   });
- *   return res.json();
+ *   const json = await res.json();
+ *   // json.data.strategy_response là StrategyResponse
+ *   const { text, actions } = buildChatReplyFromStrategy(json.data.strategy_response);
  */
 export async function postChatMessage(
   payload: PostChatMessageRequest,
@@ -29,14 +55,17 @@ export async function postChatMessage(
   // Simulate agent thinking time
   await delay(600);
 
+  const { text, actions } = buildChatReplyFromStrategy(MOCK_STRATEGY_RESPONSE);
+
   return {
     success: true,
     data: {
       session_id: payload.session_id,
       reply: {
-        ...MOCK_CHAT_REPLY.reply,
         message_id: `m_${Date.now()}`, // unique mỗi lần — tránh duplicate key
-        text: MOCK_CHAT_REPLY.reply.text,
+        role: 'assistant',
+        text,
+        actions,
       },
     },
   };
