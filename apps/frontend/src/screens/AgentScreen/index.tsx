@@ -8,10 +8,11 @@ import {
     KeyboardAvoidingView,
     Platform,
     StatusBar,
-    SafeAreaView,
     Modal,
     ListRenderItem,
+    ImageBackground,
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { LiquidGlassView, isLiquidGlassSupported } from '@callstack/liquid-glass';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, SendHorizonal, Camera, Image, Link, X } from 'lucide-react-native';
@@ -131,156 +132,162 @@ const AgentScreen: React.FC = () => {
     );
 
     return (
-        <SafeAreaView style={styles.root}>
-            <StatusBar barStyle="light-content" backgroundColor="#000000" translucent={false} />
+        <ImageBackground
+            source={require('../../../assets/backround-01.png')}
+            style={styles.root}
+            resizeMode="cover"
+        >
+            <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                <StatusBar barStyle="light-content" backgroundColor="#000000" translucent={false} />
 
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
-            >
-                {/* ── Centered Header ── */}
-                <AppHeader subtitle="AI-Powered Financial Advisor" />
+                <KeyboardAvoidingView
+                    style={{ flex: 1 }}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+                >
+                    {/* ── Centered Header ── */}
+                    <AppHeader subtitle="AI-Powered Financial Advisor" />
 
-                {/* ── Message list ── */}
-                <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    keyExtractor={(item) => item.message_id}
-                    renderItem={renderItem}
-                    style={styles.messageList}
-                    contentContainerStyle={styles.listContent}
-                    onContentSizeChange={() =>
-                        flatListRef.current?.scrollToEnd({ animated: true })
-                    }
-                    onLayout={() =>
-                        flatListRef.current?.scrollToEnd({ animated: false })
-                    }
-                    showsVerticalScrollIndicator={false}
-                    ListFooterComponent={
-                        isTyping ? (
-                            <View style={styles.typingRow}>
-                                <Text style={styles.typingText}>GoalPilot is thinking...</Text>
-                            </View>
-                        ) : null
-                    }
-                />
-
-                {/* ── Input bar ── */}
-                <View style={styles.inputBar}>
-                    {/* Plus button — opens attachment bottom sheet */}
-                    <TouchableOpacity
-                        style={styles.plusBtn}
-                        onPress={() => setSheetOpen(true)}
-                    >
-                        <LiquidGlassView
-                            style={[
-                                styles.sendBtnGrad,
-                                {
-                                    borderRadius: 21,
-                                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                                    borderWidth: 0.5,
-                                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                                }
-                            ]}
-                            interactive
-                            effect="clear"
-                        >
-                            <Plus size={22} color={COLORS.textPrimary} strokeWidth={2.5} />
-                        </LiquidGlassView>
-                    </TouchableOpacity>
-
-                    <TextInput
-                        style={styles.textInput}
-                        placeholder="Ask GoalPilot anything..."
-                        placeholderTextColor={COLORS.textMuted}
-                        value={inputText}
-                        onChangeText={setInputText}
-                        multiline
-                        returnKeyType="send"
-                        onSubmitEditing={handleSend}
-                        blurOnSubmit
+                    {/* ── Message list ── */}
+                    <FlatList
+                        ref={flatListRef}
+                        data={messages}
+                        keyExtractor={(item) => item.message_id}
+                        renderItem={renderItem}
+                        style={styles.messageList}
+                        contentContainerStyle={styles.listContent}
+                        onContentSizeChange={() =>
+                            flatListRef.current?.scrollToEnd({ animated: true })
+                        }
+                        onLayout={() =>
+                            flatListRef.current?.scrollToEnd({ animated: false })
+                        }
+                        showsVerticalScrollIndicator={false}
+                        ListFooterComponent={
+                            isTyping ? (
+                                <View style={styles.typingRow}>
+                                    <Text style={styles.typingText}>GoalPilot is thinking...</Text>
+                                </View>
+                            ) : null
+                        }
                     />
 
-                    <TouchableOpacity
-                        onPress={handleSend}
-                        disabled={!inputText.trim()}
-                        style={styles.sendBtn}
-                    >
-                        <LiquidGlassView
-                            style={[
-                                styles.sendBtnGrad,
-                                {
-                                    borderRadius: 21,
-                                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                                    borderWidth: 0.5,
-                                    borderColor: 'rgba(223, 243, 242, 0.2)',
-                                }
-                            ]}
-                            interactive
-                            effect="clear"
+                    {/* ── Input bar ── */}
+                    <View style={styles.inputBar}>
+                        {/* Plus button — opens attachment bottom sheet */}
+                        <TouchableOpacity
+                            style={styles.plusBtn}
+                            onPress={() => setSheetOpen(true)}
                         >
-                            <SendHorizonal size={20} color="#FFFFFF" strokeWidth={2.5} />
-                        </LiquidGlassView>
-                    </TouchableOpacity>
-                </View>
-            </KeyboardAvoidingView>
-
-            {/* ── Attachment Bottom Sheet ── */}
-            <Modal
-                visible={sheetOpen}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setSheetOpen(false)}
-            >
-                <TouchableOpacity
-                    style={styles.sheetOverlay}
-                    activeOpacity={1}
-                    onPress={() => setSheetOpen(false)}
-                />
-                <View style={styles.sheet}>
-                    {/* Handle bar */}
-                    <View style={styles.sheetHandle} />
-
-                    <Text style={styles.sheetTitle}>Attach</Text>
-
-                    {/* 3 option buttons */}
-                    <View style={styles.sheetOptions}>
-                        {ATTACH_CONFIG.map(({ Icon, label, source }) => (
-                            <TouchableOpacity
-                                key={label}
-                                style={styles.sheetOption}
-                                activeOpacity={0.82}
-                                onPress={() => handleAttachOption(source)}
+                            <LiquidGlassView
+                                style={[
+                                    styles.sendBtnGrad,
+                                    {
+                                        borderRadius: 21,
+                                        backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                                        borderWidth: 0.5,
+                                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                                    }
+                                ]}
+                                interactive
+                                effect="clear"
                             >
-                                <LiquidGlassView
-                                    style={[
-                                        styles.sheetOptionGrad,
-                                        {
-                                            borderRadius: 22,
-                                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                            borderWidth: 1,
-                                            borderColor: 'rgba(107, 245, 255, 0.2)'
-                                        }
-                                    ]}
-                                    interactive
-                                    effect="clear"
-                                >
-                                    <Icon size={26} color={COLORS.neonCyan} strokeWidth={2} />
-                                </LiquidGlassView>
-                                <Text style={styles.sheetOptionLabel}>{label}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                                <Plus size={22} color={COLORS.textPrimary} strokeWidth={2.5} />
+                            </LiquidGlassView>
+                        </TouchableOpacity>
 
-                    {/* Dismiss */}
-                    <TouchableOpacity style={styles.sheetClose} onPress={() => setSheetOpen(false)}>
-                        <X size={20} color={COLORS.textMuted} strokeWidth={2} />
-                        <Text style={styles.sheetCloseText}>Dismiss</Text>
-                    </TouchableOpacity>
-                </View>
-            </Modal>
-        </SafeAreaView>
+                        <TextInput
+                            style={styles.textInput}
+                            placeholder="Ask GoalPilot anything..."
+                            placeholderTextColor={COLORS.textMuted}
+                            value={inputText}
+                            onChangeText={setInputText}
+                            multiline
+                            returnKeyType="send"
+                            onSubmitEditing={handleSend}
+                            blurOnSubmit
+                        />
+
+                        <TouchableOpacity
+                            onPress={handleSend}
+                            disabled={!inputText.trim()}
+                            style={styles.sendBtn}
+                        >
+                            <LiquidGlassView
+                                style={[
+                                    styles.sendBtnGrad,
+                                    {
+                                        borderRadius: 21,
+                                        backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                                        borderWidth: 0.5,
+                                        borderColor: 'rgba(223, 243, 242, 0.2)',
+                                    }
+                                ]}
+                                interactive
+                                effect="clear"
+                            >
+                                <SendHorizonal size={20} color="#FFFFFF" strokeWidth={2.5} />
+                            </LiquidGlassView>
+                        </TouchableOpacity>
+                    </View>
+                </KeyboardAvoidingView>
+
+                {/* ── Attachment Bottom Sheet ── */}
+                <Modal
+                    visible={sheetOpen}
+                    transparent
+                    animationType="slide"
+                    onRequestClose={() => setSheetOpen(false)}
+                >
+                    <TouchableOpacity
+                        style={styles.sheetOverlay}
+                        activeOpacity={1}
+                        onPress={() => setSheetOpen(false)}
+                    />
+                    <View style={styles.sheet}>
+                        {/* Handle bar */}
+                        <View style={styles.sheetHandle} />
+
+                        <Text style={styles.sheetTitle}>Attach</Text>
+
+                        {/* 3 option buttons */}
+                        <View style={styles.sheetOptions}>
+                            {ATTACH_CONFIG.map(({ Icon, label, source }) => (
+                                <TouchableOpacity
+                                    key={label}
+                                    style={styles.sheetOption}
+                                    activeOpacity={0.82}
+                                    onPress={() => handleAttachOption(source)}
+                                >
+                                    <LiquidGlassView
+                                        style={[
+                                            styles.sheetOptionGrad,
+                                            {
+                                                borderRadius: 22,
+                                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                                borderWidth: 1,
+                                                borderColor: 'rgba(107, 245, 255, 0.2)'
+                                            }
+                                        ]}
+                                        interactive
+                                        effect="clear"
+                                    >
+                                        <Icon size={26} color={COLORS.neonCyan} strokeWidth={2} />
+                                    </LiquidGlassView>
+                                    <Text style={styles.sheetOptionLabel}>{label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        {/* Dismiss */}
+                        <TouchableOpacity style={styles.sheetClose} onPress={() => setSheetOpen(false)}>
+                            <X size={20} color={COLORS.textMuted} strokeWidth={2} />
+                            <Text style={styles.sheetCloseText}>Dismiss</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Modal>
+            </SafeAreaView>
+        </ImageBackground>
     );
 };
 

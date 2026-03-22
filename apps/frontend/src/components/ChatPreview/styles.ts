@@ -1,71 +1,60 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
 import { COLORS } from '../../theme';
 import { FONT, FONT_BOLD, FONT_EXTRABOLD } from '../../utils/fonts';
+const SCREEN_W = Dimensions.get('window').width;
+const TOTAL_W = SCREEN_W - 40;
 
 const styles = StyleSheet.create({
-  // ── Container ────────────────────────────────────────────
   container: {
+    width: TOTAL_W,
+    height: 96,
     borderRadius: 24,
-    marginHorizontal: 20,
+    alignSelf: 'center',
+    marginTop: 10,
     overflow: 'hidden',
-    shadowColor: '#7C6FF7',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
-  },
-  bgGradient: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
   },
   innerPad: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 18,
+    height: '100%',
   },
 
   // ── Avatar ────────────────────────────────────────────────
-  avatarWrap: {
+  avatarContainer: {
+    width: 52,
+    height: 52,
+    marginRight: 14,
+  },
+  avatarImage: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    overflow: 'hidden',
-    marginRight: 14,
-    shadowColor: '#7C6FF7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.55,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  avatarGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
   },
   unreadBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: -4,
+    right: -4,
     backgroundColor: COLORS.glowPink,
     borderRadius: 10,
-    minWidth: 18,
-    height: 18,
+    minWidth: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: COLORS.bgDark,
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#1E1E24',
+    elevation: 4,
   },
   unreadText: {
     fontFamily: FONT_BOLD,
-    fontSize: 9,
+    fontSize: 10,
     color: '#FFFFFF',
   },
 
   // ── Text ─────────────────────────────────────────────────
-  textBlock: { flex: 1 },
+  textBlock: { flex: 1, justifyContent: 'center' },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -107,7 +96,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Chevron ──────────────────────────────────────────────
-  chevronWrap: { width: 24, alignItems: 'center', marginLeft: 4 },
+  chevronWrap: { width: 24, alignItems: 'center', marginLeft: 4, justifyContent: 'center' },
 });
 
 export default styles;

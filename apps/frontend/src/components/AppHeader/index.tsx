@@ -6,7 +6,7 @@ import { FONT_EXTRABOLD } from '../../utils/fonts';
 const AppHeader: React.FC<{ subtitle?: string }> = ({ subtitle }) => {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.wrap, { paddingTop: insets.top + 12 }]}>
+    <View style={[styles.wrap, { paddingTop: insets.top }]}>
       <Text style={styles.logo}>GoalPilot</Text>
       {subtitle ? <Text style={styles.sub}>{subtitle}</Text> : null}
     </View>

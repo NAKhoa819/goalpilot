@@ -38,11 +38,6 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     //justifyContent: 'center',
     //alignItems: 'center',
-    shadowColor: COLORS.neonCyan,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 5,
     backgroundColor: 'transparent',
   },
 
@@ -68,11 +63,6 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: 21,
     overflow: 'visible',
-    shadowColor: COLORS.neonCyan,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 5,
     backgroundColor: 'transparent',
   },
   sendBtnGrad: {
