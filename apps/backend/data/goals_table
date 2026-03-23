@@ -3,9 +3,13 @@
 CREATE TABLE goals (
     goal_id VARCHAR(50) PRIMARY KEY,
     goal_name NVARCHAR(255) NOT NULL,
-    target_amount DECIMAL(15, 2) NOT NULL, 
+    goal_type VARCHAR(50) NOT NULL, 
+    target_amount DECIMAL(15,2) NOT NULL,
     target_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'on_track',
-    created_at DATETIME2 DEFAULT GETDATE(),
-    CONSTRAINT chk_goal_status CHECK (status IN ('on_track', 'at_risk', 'completed', 'paused'))
+    currency VARCHAR(10) DEFAULT 'VND', 
+    status VARCHAR(50) DEFAULT 'on_track',
+    created_from VARCHAR(50), 
+    created_at DATETIME DEFAULT GETDATE(),
+    CONSTRAINT chk_goal_status CHECK (status IN ('on_track', 'at_risk', 'completed', 'paused')),
+    CONSTRAINT chk_goal_type CHECK (goal_type IN ('purchase', 'saving', 'emergency_fund', 'custom'))
 );
