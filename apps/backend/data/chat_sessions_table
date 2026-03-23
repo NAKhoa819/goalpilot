@@ -1,6 +1,6 @@
 -- 2. Bảng chat_sessions: Lưu thông tin phiên chat với AI
 CREATE TABLE chat_sessions (
-    id VARCHAR(50) PRIMARY KEY,
+    session_id VARCHAR(50) PRIMARY KEY,
     created_at DATETIME DEFAULT GETDATE()
 );
 
