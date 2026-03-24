@@ -1,29 +1,13 @@
-from copy import deepcopy
+"""
+user_context_store.py — User financial context backed by SQL Server.
+
+Aggregates balance, income, and spending from the `transactions` table
+and provides functions to insert new transactions.
+"""
+
 from datetime import datetime, timedelta
 
-
-def _days_ago_string(days: int) -> str:
-    return (datetime.today() - timedelta(days=days)).strftime("%Y-%m-%d")
-
-
-DEFAULT_USER_CONTEXT: dict = {
-    "balance": 5_000.0,
-    "monthly_income": 9_000.0,
-    "monthly_spending": 4_500.0,
-    "projected_savings": 2_000.0,
-    "recent_transactions": [
-        {"date": _days_ago_string(4), "amount": 150.0, "category": "Dining", "description": "Lunch"},
-        {"date": _days_ago_string(3), "amount": 2_500.0, "category": "Rent", "description": "Rent"},
-        {"date": _days_ago_string(2), "amount": 300.0, "category": "Groceries", "description": "Groceries"},
-        {"date": _days_ago_string(1), "amount": 3_000.0, "category": "Salary", "description": "Salary"},
-    ],
-}
-
-_user_context: dict = deepcopy(DEFAULT_USER_CONTEXT)
-
-
-def get_user_context() -> dict:
-    return deepcopy(_user_context)
+from data.db import execute_query, execute_non_query
 
 
 def _today_string() -> str:
@@ -36,45 +20,110 @@ def _normalize_entry_amount(value: float | int | None) -> float:
     return float(value)
 
 
+def get_user_context() -> dict:
+    """
+    Build user financial context by aggregating transactions.
+    Returns dict with: balance, monthly_income, monthly_spending,
+    projected_savings, recent_transactions.
+    """
+    # Recent transactions (last 30 days)
+    thirty_days_ago = (datetime.today() - timedelta(days=30)).strftime("%Y-%m-%d")
+    recent_rows = execute_query(
+        """
+        SELECT [date], amount, category, description, type
+        FROM transactions
+        WHERE [date] >= ?
+        ORDER BY [date] DESC
+        """,
+        (thirty_days_ago,),
+    )
+
+    recent_transactions = []
+    monthly_income = 0.0
+    monthly_spending = 0.0
+
+    for row in recent_rows:
+        tx_date = row["date"]
+        if isinstance(tx_date, datetime):
+            tx_date = tx_date.strftime("%Y-%m-%d")
+        elif hasattr(tx_date, "strftime"):
+            tx_date = tx_date.strftime("%Y-%m-%d")
+        else:
+            tx_date = str(tx_date)
+
+        amount = float(row.get("amount", 0))
+        tx_type = row.get("type", "expense")
+
+        if tx_type == "income":
+            monthly_income += amount
+        else:
+            monthly_spending += amount
+
+        recent_transactions.append({
+            "date": tx_date,
+            "amount": amount,
+            "category": row.get("category", "Other"),
+            "description": row.get("description", ""),
+        })
+
+    balance = monthly_income - monthly_spending
+    projected_savings = max(0.0, balance * 0.5)
+
+    return {
+        "balance": max(0.0, balance),
+        "monthly_income": monthly_income,
+        "monthly_spending": monthly_spending,
+        "projected_savings": projected_savings,
+        "recent_transactions": recent_transactions,
+    }
+
+
 def apply_manual_input(payload: dict) -> int:
+    """Process manual input payload — insert transactions and/or update context."""
     imported_count = 0
 
-    monthly_income = payload.get("monthly_income")
-    current_balance = payload.get("current_balance")
-    projected_savings = payload.get("projected_savings")
-
-    if monthly_income is not None:
-        _user_context["monthly_income"] = _normalize_entry_amount(monthly_income)
-        imported_count += 1
-
-    if current_balance is not None:
-        _user_context["balance"] = _normalize_entry_amount(current_balance)
-        imported_count += 1
-
-    if projected_savings is not None:
-        _user_context["projected_savings"] = _normalize_entry_amount(projected_savings)
-        imported_count += 1
-
+    # Direct income/expense entry
     entry_type = payload.get("entry_type")
     amount = payload.get("amount")
     if entry_type in {"income", "expense"} and amount is not None:
         tx_amount = _normalize_entry_amount(amount)
-        if entry_type == "income":
-            _user_context["balance"] += tx_amount
-            _user_context["monthly_income"] += tx_amount
-            category = "Salary"
-        else:
-            _user_context["balance"] = max(0.0, _user_context["balance"] - tx_amount)
-            _user_context["monthly_spending"] += tx_amount
-            category = "Shopping"
-
-        _user_context["recent_transactions"].append({
-            "date": _today_string(),
-            "amount": tx_amount,
-            "category": category,
-            "description": "Manual entry",
-        })
+        category = "Salary" if entry_type == "income" else "Shopping"
+        execute_non_query(
+            """
+            INSERT INTO transactions ([date], amount, category, description, type, source)
+            VALUES (?, ?, ?, ?, ?, 'manual')
+            """,
+            (_today_string(), tx_amount, category, "Manual entry", entry_type),
+        )
         imported_count += 1
+
+    # Monthly income / balance / savings as income transactions
+    monthly_income = payload.get("monthly_income")
+    if monthly_income is not None:
+        execute_non_query(
+            """
+            INSERT INTO transactions ([date], amount, category, description, type, source)
+            VALUES (?, ?, 'Salary', 'Monthly income input', 'income', 'manual')
+            """,
+            (_today_string(), _normalize_entry_amount(monthly_income)),
+        )
+        imported_count += 1
+
+    current_balance = payload.get("current_balance")
+    if current_balance is not None:
+        # Record as an income adjustment
+        execute_non_query(
+            """
+            INSERT INTO transactions ([date], amount, category, description, type, source)
+            VALUES (?, ?, 'Balance', 'Balance adjustment', 'income', 'manual')
+            """,
+            (_today_string(), _normalize_entry_amount(current_balance)),
+        )
+        imported_count += 1
+
+    projected_savings = payload.get("projected_savings")
+    if projected_savings is not None:
+        imported_count += 1  # Noted but not stored as transaction
 
     categories = payload.get("categories", [])
     if categories:
@@ -84,26 +133,25 @@ def apply_manual_input(payload: dict) -> int:
 
 
 def apply_transactions(transactions: list[dict]) -> int:
-    valid_transactions = []
+    """Bulk-insert transactions from OCR/SMS/file sources."""
+    valid_count = 0
     for tx in transactions:
         if tx.get("date") and tx.get("amount") is not None:
-            valid_transactions.append({
-                "date": tx["date"],
-                "amount": float(tx["amount"]),
-                "category": tx.get("category", "Imported"),
-                "description": tx.get("description", "Imported transaction"),
-            })
+            tx_amount = float(tx["amount"])
+            category = tx.get("category", "Imported")
+            description = tx.get("description", "Imported transaction")
 
-    _user_context["recent_transactions"].extend(valid_transactions)
+            # Determine type based on category
+            income_categories = {"salary", "income", "bonus", "refund"}
+            tx_type = "income" if category.lower() in income_categories else "expense"
 
-    for tx in valid_transactions:
-        category = str(tx.get("category", "")).lower()
-        amount = float(tx["amount"])
-        if category in ("salary", "income", "bonus", "refund"):
-            _user_context["monthly_income"] += amount
-            _user_context["balance"] += amount
-        else:
-            _user_context["monthly_spending"] += amount
-            _user_context["balance"] = max(0.0, _user_context["balance"] - amount)
+            execute_non_query(
+                """
+                INSERT INTO transactions ([date], amount, category, description, type, source)
+                VALUES (?, ?, ?, ?, ?, 'manual')
+                """,
+                (tx["date"], tx_amount, category, description, tx_type),
+            )
+            valid_count += 1
 
-    return len(valid_transactions)
+    return valid_count

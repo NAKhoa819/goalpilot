@@ -1,41 +1,31 @@
+"""
+goal_store.py — Goal data access layer backed by SQL Server.
+
+Provides CRUD operations against the `goals` table.
+"""
+
 import uuid
 
-
-DEFAULT_GOALS: list[dict] = [
-    {
-        "goal_id": "g001",
-        "goal_name": "High Priority Retirement",
-        "goal_type": "saving",
-        "target_amount": 1_000_000.0,
-        "target_date": "2026-12-01",
-        "currency": "VND",
-        "created_from": "seed",
-        "current_saved": 50_000.0,
-        "status": "at_risk",
-    },
-    {
-        "goal_id": "g002",
-        "goal_name": "Vacation 2024",
-        "goal_type": "purchase",
-        "target_amount": 3_000.0,
-        "target_date": "2026-12-01",
-        "currency": "VND",
-        "created_from": "seed",
-        "current_saved": 500.0,
-        "status": "at_risk",
-    },
-]
-
-_goals_store: dict[str, dict] = {goal["goal_id"]: dict(goal) for goal in DEFAULT_GOALS}
+from data.db import execute_query, execute_non_query
 
 
 def list_goals() -> list[dict]:
-    return [dict(goal) for goal in _goals_store.values()]
+    """Return all goals."""
+    rows = execute_query("SELECT * FROM goals ORDER BY created_at DESC")
+    # Ensure current_saved is present (default 0) for API contract compatibility
+    for row in rows:
+        row.setdefault("current_saved", 0.0)
+    return rows
 
 
 def get_goal(goal_id: str) -> dict | None:
-    goal = _goals_store.get(goal_id)
-    return dict(goal) if goal else None
+    """Return a single goal by ID, or None."""
+    rows = execute_query("SELECT * FROM goals WHERE goal_id = ?", (goal_id,))
+    if not rows:
+        return None
+    goal = rows[0]
+    goal.setdefault("current_saved", 0.0)
+    return goal
 
 
 def create_goal(
@@ -46,8 +36,16 @@ def create_goal(
     currency: str = "VND",
     created_from: str | None = None,
 ) -> dict:
+    """Insert a new goal and return its dict representation."""
     goal_id = f"g_{uuid.uuid4().hex[:8]}"
-    goal = {
+    execute_non_query(
+        """
+        INSERT INTO goals (goal_id, goal_name, goal_type, target_amount, target_date, currency, status, created_from)
+        VALUES (?, ?, ?, ?, ?, ?, 'on_track', ?)
+        """,
+        (goal_id, goal_name, goal_type, float(target_amount), target_date, currency, created_from),
+    )
+    return {
         "goal_id": goal_id,
         "goal_name": goal_name,
         "goal_type": goal_type,
@@ -58,9 +56,9 @@ def create_goal(
         "current_saved": 0.0,
         "status": "on_track",
     }
-    _goals_store[goal_id] = goal
-    return dict(goal)
 
 
 def get_goal_ids() -> list[str]:
-    return list(_goals_store.keys())
+    """Return all goal IDs."""
+    rows = execute_query("SELECT goal_id FROM goals")
+    return [row["goal_id"] for row in rows]

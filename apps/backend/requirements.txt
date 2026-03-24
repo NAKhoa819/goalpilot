@@ -10,6 +10,9 @@ pydantic
 # Math & Logic
 numpy
 
+# Database
+pyodbc
+
 # Environment & API
 python-dotenv
 fastapi
