@@ -1,0 +1,16 @@
+-- 4. Bảng transactions: Lưu lịch sử dòng tiền 
+CREATE TABLE transactions (
+    transaction_id INT IDENTITY(1,1) PRIMARY KEY, 
+    [date] DATE NOT NULL, 
+    amount DECIMAL(15,2) NOT NULL,
+    category VARCHAR(100),
+    description NVARCHAR(255), 
+    is_essential BIT DEFAULT 0, 
+    source VARCHAR(50) DEFAULT 'manual', 
+    type VARCHAR(20) NOT NULL,   
+    goal_id VARCHAR(50),         
+    created_at DATETIME DEFAULT GETDATE(),   
+    FOREIGN KEY (goal_id) REFERENCES goals(goal_id),
+    CONSTRAINT chk_trans_type CHECK (type IN ('income', 'expense')),
+    CONSTRAINT chk_trans_source CHECK (source IN ('manual'))
+);
