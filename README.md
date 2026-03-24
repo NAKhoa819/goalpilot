@@ -1,63 +1,179 @@
 # GoalPilot
 
-Monorepo skeleton project.
+Monorepo gồm:
+- `apps/backend`: FastAPI backend
+- `apps/frontend`: React Native / Expo frontend
+- `docs`: tài liệu dự án
+- `infra`: hạ tầng và deployment
+- `packages`: shared packages nếu cần
 
-## Cấu trúc thư mục:
-- `apps/backend/`: chứa các service backend của dự án.
-  - `input/`: khung cho phần tiếp nhận dữ liệu đầu vào như manual entry, SMS reading, OCR ingestion.
-  - `intelligence/`: khung cho forecasting, reasoning, recommendation, và AI-related logic.
-  - `data/`: khung cho data access, persistence, database interaction, và external data provider integration nếu sau này cần.
-- `apps/frontend/`: khung cho mobile/web frontend.
-- `docs/`: để tài liệu dự án.
-- `infra/`: để deployment/configuration/docker về sau.
-- `packages/`: để shared package hoặc shared types nếu sau này cần.
+## Yêu cầu
 
----
+Chạy local:
+- Python 3.11+
+- Node.js 18+
+- SQL Server Express
+- ODBC Driver 17 for SQL Server
 
-## Hướng dẫn chạy dự án (Development)
+Chạy bằng Docker:
+- Docker Desktop
 
-Dự án hiện tại có **Backend (FastAPI)** và **Frontend (React Native / Expo)**. Bạn cần mở 2 cửa sổ terminal riêng biệt để chạy song song.
+## Khởi tạo từ đầu
 
-### 1. Khởi động Backend (FastAPI)
+Tại thư mục gốc repo:
 
-Backend sử dụng môi trường ảo (virtual environment). Cần kích hoạt môi trường và khởi động server Uvicorn.
-
-```bash
-# 1. Mở cửa sổ terminal mới tại thư mục gốc của dự án (goalpilot/)
-# 2. Kích hoạt môi trường ảo (Windows)
-.\venv\Scripts\activate
-
-# 3. Chuyển vào thư mục mã nguồn Backend (đã refactor)
-cd apps/backend
-
-# 4. Khởi động server (sử dụng provider 'mock' để test mà không tốn API key)
-# Thêm --host 0.0.0.0 để Expo Go từ điện thoại có thể truy cập được
-$env:ACTIVE_LLM_PROVIDER="backup"
-$env:BACKUP_PROVIDER="mock"
-uvicorn main_api:app --host 0.0.0.0 --port 8000 --reload
+```powershell
+git clone <repo-url>
+cd goalpilot
 ```
-> Server Backend sẽ chạy tại: `http://localhost:8000`
-> Tài liệu API Swagger UI: `http://localhost:8000/docs`
 
-### 2. Khởi động Frontend (React Native / Expo)
+Tạo file env từ mẫu:
 
-Frontend cần kết nối với Backend thông qua IP thật của máy bạn trên mạng LAN (đặc biệt khi bạn test bằng điện thoại qua Expo Go).
+```powershell
+Copy-Item .env.example .env
+```
+
+Nếu dùng Git Bash hoặc WSL:
 
 ```bash
-# 1. Tìm địa chỉ IP máy tính trên mạng LAN (ví dụ: 192.168.1.5)
-# Sử dụng lệnh ipconfig trên Windows để tìm "IPv4 Address"
+cp .env.example .env
+```
 
-# 2. Mở cửa sổ terminal thứ 2 tại thư mục gốc của dự án (goalpilot/)
+Sau đó chỉnh lại các biến trong `.env`, tối thiểu:
+- `EXPO_PUBLIC_API_URL`
+- `ACTIVE_LLM_PROVIDER`, `BACKUP_PROVIDER`, `BACKUP_MODEL_ID`
+- `GOOGLE_API_KEY` hoặc `GROQ_API_KEY` nếu dùng provider thật
+- `DB_SERVER`
+
+## Chạy local
+
+### 1. Cài backend
+
+```powershell
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r apps/backend/requirements.txt
+```
+
+### 2. Cấu hình database local
+
+Mặc định backend local dùng:
+
+```env
+DB_SERVER=localhost\SQLEXPRESS
+DB_NAME=swinhackathon_db
+DB_DRIVER={ODBC Driver 17 for SQL Server}
+DB_TRUSTED_CONNECTION=yes
+DB_TRUST_SERVER_CERTIFICATE=yes
+DB_ENCRYPT=no
+```
+
+Khi backend khởi động, app sẽ tự:
+- tạo database `swinhackathon_db` nếu chưa có
+- tạo schema cần thiết
+- seed dữ liệu goal mặc định
+
+### 3. Chạy backend
+
+```powershell
+cd apps/backend
+..\..\venv\Scripts\python -m uvicorn main_api:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Backend:
+- API: `http://localhost:8000`
+- Swagger: `http://localhost:8000/docs`
+
+### 4. Cài frontend
+
+Mở terminal khác tại root repo:
+
+```powershell
 cd apps/frontend
-
-# 3. (Nếu chưa chạy lần nào) Cài đặt dependencies
 npm install
+```
 
-# 4. Tạo file .env nếu chưa có và cấu hình URL của Backend
-# Thay <IP_CỦA_BẠN> bằng địa chỉ IP vừa tìm được ở bước 1 (ví dụ: 192.168.1.5)
-echo "EXPO_PUBLIC_API_URL=http://<IP_CỦA_BẠN>:8000" > .env
+### 5. Chạy frontend
 
-# 5. Khởi động Expo
+Trong `.env`, đặt:
+
+```env
+EXPO_PUBLIC_API_URL=http://<IP_MAY_CUA_BAN>:8000
+```
+
+Ví dụ nếu test bằng điện thoại qua Expo Go, dùng IP LAN của máy thay vì `localhost`.
+
+Chạy app:
+
+```powershell
+cd apps/frontend
 npm start
 ```
-> Quét mã QR hiện ra trên terminal hoặc trình duyệt bằng ứng dụng **Expo Go** trên điện thoại (đảm bảo điện thoại và máy tính dùng chung mạng Wi-Fi) để xem kết quả.
+
+## Chạy bằng Docker
+
+Docker Compose sẽ chạy:
+- SQL Server Express container
+- backend container
+
+Tại thư mục gốc repo:
+
+```powershell
+docker compose up --build
+```
+
+Khi chạy bằng Docker:
+- backend lên tại `http://localhost:8000`
+- SQL Server lên tại port `1433`
+- backend tự tạo database `swinhackathon_db` và schema khi startup
+
+Nếu muốn chạy nền:
+
+```powershell
+docker compose up --build -d
+```
+
+Dừng container:
+
+```powershell
+docker compose down
+```
+
+Xem log:
+
+```powershell
+docker compose logs -f backend
+docker compose logs -f sqlserver
+```
+
+## Biến môi trường chính
+
+Frontend:
+- `EXPO_PUBLIC_API_URL`
+
+Backend LLM:
+- `ACTIVE_LLM_PROVIDER`
+- `BACKUP_PROVIDER`
+- `BACKUP_MODEL_ID`
+- `GOOGLE_API_KEY`
+- `GROQ_API_KEY`
+- `BEDROCK_MODEL`
+
+Backend SQL Server local:
+- `DB_SERVER`
+- `DB_NAME`
+- `DB_DRIVER`
+- `DB_TRUSTED_CONNECTION`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_TRUST_SERVER_CERTIFICATE`
+- `DB_ENCRYPT`
+
+Docker SQL Server:
+- `SQLSERVER_SA_PASSWORD`
+
+## Lưu ý
+
+- `.env` bị ignore bởi Git, không push file này lên repo.
+- Dùng [`.env.example`](/d:/swin/swin2026/goalpilot/.env.example) làm mẫu chia sẻ cấu hình.
+- Nếu Dashboard không lên, kiểm tra backend trước ở `/docs` và `/api/dashboard`.

@@ -6,15 +6,19 @@ GET /api/dashboard
 
 from fastapi import APIRouter
 
-from data.goal_store import list_goals
+from api.chat_seed import ensure_chat_seed
+from data.goal_store import list_goals, sync_goals_with_user_context
 from memory.history import ConversationHistory
+from memory.retriever import ContextRetriever
 
 router = APIRouter()
 
 
 @router.get("/dashboard")
 def get_dashboard():
-    ConversationHistory.ensure_session("s001", seed_welcome=True)
+    ensure_chat_seed("s001")
+    user_context = ContextRetriever().fetch_user_financial_context(user_id="user_123")
+    sync_goals_with_user_context(user_context)
     history = ConversationHistory("s001")
     messages = history.get_all_messages()
 
@@ -37,6 +41,8 @@ def get_dashboard():
 
     active_goal_id = goal_cards[0]["goal_id"] if goal_cards else "g001"
     last_message = messages[-1]["content"] if messages else "How can I help with your financial goals today?"
+    last_actions = messages[-1].get("actions", []) if messages else []
+    unread_count = 1 if any(action.get("type") in {"plan_a", "plan_b"} for action in last_actions) else 0
 
     return {
         "success": True,
@@ -46,7 +52,7 @@ def get_dashboard():
             "chat_preview": {
                 "session_id": "s001",
                 "last_message": last_message,
-                "unread_count": 0,
+                "unread_count": unread_count,
             },
             "input_actions": [
                 {"type": "manual_input", "label": "Enter Data"},

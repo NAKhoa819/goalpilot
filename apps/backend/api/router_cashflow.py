@@ -23,22 +23,37 @@ def _error(message: str, error_code: str, status_code: int = 400):
     )
 
 
+def _empty_weekly_points(period_start: datetime) -> list[dict]:
+    points: list[dict] = []
+    for i in range(7):
+        day = (period_start + timedelta(days=i)).strftime("%Y-%m-%d")
+        points.append({"date": day, "income": 0, "expense": 0, "net": 0})
+    return points
+
+
 @router.get("/cashflow/weekly")
 def get_cashflow_weekly(goal_id: Optional[str] = Query(default=None)):
+    period_end = datetime.today()
+    period_start = period_end - timedelta(days=6)
+
     retriever = ContextRetriever()
     user_context = retriever.fetch_user_financial_context(user_id="user_123")
     transactions = user_context.get("recent_transactions", [])
 
     if not transactions:
-        return _error("No transaction data available.", "NO_DATA_AVAILABLE", 404)
+        return {
+            "success": True,
+            "data": {
+                "period_start": period_start.strftime("%Y-%m-%d"),
+                "period_end": (period_start + timedelta(days=6)).strftime("%Y-%m-%d"),
+                "points": _empty_weekly_points(period_start),
+            },
+        }
 
     if goal_id:
         valid_ids = set(get_goal_ids())
         if goal_id not in valid_ids:
             return _error(f"goal_id '{goal_id}' is invalid.", "INVALID_GOAL_ID", 400)
-
-    period_end = datetime.today()
-    period_start = period_end - timedelta(days=6)
 
     daily: dict[str, dict] = {}
     for i in range(7):

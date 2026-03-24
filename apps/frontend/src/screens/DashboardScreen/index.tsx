@@ -1,8 +1,9 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
+  SafeAreaView,
   StatusBar,
   TouchableOpacity,
   ActivityIndicator,
@@ -11,15 +12,14 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
 import { PenLine, ScanLine, Images } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import GoalSlider from '../../components/GoalSlider';
 import FinancialChart from '../../components/FinancialChart';
 import ChatPreview from '../../components/ChatPreview';
 import AppHeader from '../../components/AppHeader';
-import { getDashboard, submitManualEntry, uploadReceipt } from '../../coordinator/dashboardCoordinator';
 import { getCashFlow } from '../../coordinator/cashFlowCoordinator';
+import { getDashboard, submitManualEntry, uploadReceipt } from '../../coordinator/dashboardCoordinator';
 import type { CashFlowPoint, DashboardData } from '../../coordinator/types';
 import { COLORS } from '../../theme';
 import { FONT_BOLD, FONT_EXTRABOLD } from '../../utils/fonts';
@@ -30,6 +30,11 @@ const ACTION_CONFIG = [
   { bg: COLORS.bgCardAlt, glow: COLORS.neonYellow, Icon: ScanLine, label: 'Scan Receipt' },
   { bg: COLORS.bgCardAlt, glow: COLORS.neonPurple, Icon: Images,   label: 'Add Library'  },
 ];
+
+function parseAmountInput(value: string): number {
+  const normalized = value.replace(/[^\d-]/g, '');
+  return normalized ? Number(normalized) : NaN;
+}
 
 const DashboardScreen: React.FC = () => {
   const [activeGoalId, setActiveGoalId] = useState<string | null>(null);
@@ -47,15 +52,20 @@ const DashboardScreen: React.FC = () => {
     try {
       setIsLoading(true);
       setIsError(false);
-      const [dashboardRes, cashFlowRes] = await Promise.all([
+      const [dashboardRes, cashFlowResult] = await Promise.allSettled([
         getDashboard(),
         getCashFlow(),
       ]);
 
-      if (dashboardRes.success && dashboardRes.data) {
-        setDashboardData(dashboardRes.data);
-        setActiveGoalId((current) => current ?? dashboardRes.data.active_goal_id);
-        setCashFlowPoints(cashFlowRes.success && cashFlowRes.data ? cashFlowRes.data.points : []);
+      if (dashboardRes.status === 'fulfilled' && dashboardRes.value.success && dashboardRes.value.data) {
+        setDashboardData(dashboardRes.value.data);
+        setActiveGoalId(dashboardRes.value.data.active_goal_id);
+
+        if (cashFlowResult.status === 'fulfilled' && cashFlowResult.value.success && cashFlowResult.value.data) {
+          setCashFlowPoints(cashFlowResult.value.data.points);
+        } else {
+          setCashFlowPoints([]);
+        }
       } else {
         setIsError(true);
       }
@@ -80,10 +90,17 @@ const DashboardScreen: React.FC = () => {
 
   const handleSubmitManual = async () => {
     if (!entryType || !entryAmount) return;
-    await submitManualEntry(entryType, Number(entryAmount));
+    const amount = parseAmountInput(entryAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
+    await submitManualEntry(entryType, amount);
     setEntryModalVisible(false);
     await loadDashboard();
   };
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
 
   useFocusEffect(
     useCallback(() => {

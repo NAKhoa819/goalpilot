@@ -14,6 +14,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
+from api.chat_seed import ensure_chat_seed
 from intelligence.intelligence import calculate_metrics, determine_strategy
 from intelligence.llm_gateway import build_fallback_chat_advice, get_chat_advice
 from memory.history import ConversationHistory
@@ -167,6 +168,35 @@ def _build_goal_acknowledgement(context: ChatContext | None) -> str:
     return f"I have created {goal_name}{suffix}. You can review it from the dashboard."
 
 
+def _build_plan_acknowledgement(context: ChatContext | None) -> str:
+    payload = context.model_dump() if context else {}
+    strategy = payload.get("strategy")
+
+    if strategy == "increase_savings":
+        amount = payload.get("amount")
+        duration = payload.get("duration_months")
+        details = []
+        if amount:
+            details.append(f"save an extra {amount:,} VND per month")
+        if duration:
+            details.append(f"for the next {duration} months")
+        suffix = f" by {' '.join(details)}" if details else ""
+        return f"Plan A selected. I will guide you{suffix} to recover the goal timeline."
+
+    if strategy == "extend_deadline":
+        months = payload.get("months")
+        new_target_date = payload.get("new_target_date")
+        details = []
+        if months:
+            details.append(f"extend the deadline by {months} months")
+        if new_target_date:
+            details.append(f"toward {new_target_date}")
+        suffix = f" to {' and '.join(details)}" if details else ""
+        return f"Plan B selected. I will guide you{suffix} so the goal remains achievable."
+
+    return "I noted your plan adjustment choice. You can keep reviewing it in the dashboard."
+
+
 @router.post("/chat/message")
 def post_chat_message(body: PostChatMessageRequest):
     if not body.message or not body.message.strip():
@@ -191,6 +221,12 @@ def post_chat_message(body: PostChatMessageRequest):
 
     if user_text.lower() == "create goal" and source_screen == "agent_action":
         reply_text = _build_goal_acknowledgement(body.context)
+    elif source_screen == "agent_action" and body.context:
+        context_payload = body.context.model_dump()
+        if context_payload.get("strategy") in {"increase_savings", "extend_deadline"}:
+            reply_text = _build_plan_acknowledgement(body.context)
+        else:
+            reply_text = "I noted your action. Let me know if you want to refine the plan further."
     else:
         create_goal_action = _detect_create_goal_action(user_text)
         if create_goal_action:
@@ -236,12 +272,7 @@ def post_chat_message(body: PostChatMessageRequest):
 
 @router.get("/chat/session/{session_id}")
 def get_chat_session(session_id: str):
-    if not ConversationHistory.session_exists(session_id):
-        return _error(
-            f"Session '{session_id}' not found.",
-            "SESSION_NOT_FOUND",
-            status_code=404,
-        )
+    ensure_chat_seed(session_id)
 
     history = ConversationHistory(session_id)
     raw_messages = history.get_all_messages()

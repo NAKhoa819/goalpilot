@@ -1,0 +1,39 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: goalpilot-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Express"
+      SA_PASSWORD: "${SQLSERVER_SA_PASSWORD:-YourStrong!Passw0rd}"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+
+  backend:
+    build:
+      context: ./apps/backend
+    container_name: goalpilot-backend
+    depends_on:
+      - sqlserver
+    environment:
+      ACTIVE_LLM_PROVIDER: "${ACTIVE_LLM_PROVIDER:-backup}"
+      BACKUP_PROVIDER: "${BACKUP_PROVIDER:-mock}"
+      BACKUP_MODEL_ID: "${BACKUP_MODEL_ID:-llama-3.3-70b-versatile}"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY:-}"
+      BEDROCK_MODEL: "${BEDROCK_MODEL:-bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0}"
+      DB_SERVER: "sqlserver"
+      DB_NAME: "swinhackathon_db"
+      DB_DRIVER: "{ODBC Driver 18 for SQL Server}"
+      DB_TRUSTED_CONNECTION: "no"
+      DB_USER: "sa"
+      DB_PASSWORD: "${SQLSERVER_SA_PASSWORD:-YourStrong!Passw0rd}"
+      DB_TRUST_SERVER_CERTIFICATE: "yes"
+      DB_ENCRYPT: "no"
+    ports:
+      - "8000:8000"
+
+volumes:
+  sqlserver-data:

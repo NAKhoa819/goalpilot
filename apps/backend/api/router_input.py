@@ -10,8 +10,9 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from data.goal_store import get_goal_ids
+from data.goal_store import get_goal_ids, sync_goals_with_user_context
 from data.user_context_store import apply_manual_input, apply_transactions
+from memory.retriever import ContextRetriever
 
 router = APIRouter()
 
@@ -54,6 +55,9 @@ def post_input_data(body: InputDataRequest):
 
     if imported_count == 0:
         return _error("No valid records found in payload.", "NO_VALID_RECORDS")
+
+    user_context = ContextRetriever().fetch_user_financial_context(user_id="user_123")
+    sync_goals_with_user_context(user_context)
 
     return {
         "success": True,

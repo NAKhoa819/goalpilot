@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from data.goal_store import create_goal as create_goal_entry
 from data.goal_store import get_goal
+from data.goal_store import sync_goals_with_user_context
 from intelligence.intelligence import calculate_metrics, determine_strategy
 from intelligence.llm_gateway import get_completion
 from intelligence.prompts import build_system_prompt
@@ -76,6 +77,10 @@ def get_goal_progress(goal_id: str):
 
     retriever = ContextRetriever()
     user_context = retriever.fetch_user_financial_context(user_id="user_123")
+    sync_goals_with_user_context(user_context)
+    goal = get_goal(goal_id)
+    if goal is None:
+        return _error(f"Goal '{goal_id}' not found.", "GOAL_NOT_FOUND", 404)
 
     profile = {
         "mu_hist": user_context.get("monthly_spending", 4500.0) * 0.9,
