@@ -14,7 +14,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api import router_chat, router_goals, router_dashboard, router_cashflow, router_input
+from api import router_chat, router_goals, router_dashboard, router_cashflow, router_input, router_market
 from data.db import ensure_database_initialized
 
 app = FastAPI(
@@ -38,6 +38,7 @@ app.include_router(router_goals.router,     prefix="/api", tags=["Goals"])
 app.include_router(router_dashboard.router, prefix="/api", tags=["Dashboard"])
 app.include_router(router_cashflow.router,  prefix="/api", tags=["CashFlow"])
 app.include_router(router_input.router,     prefix="/api", tags=["InputData"])
+app.include_router(router_market.router,    prefix="/api", tags=["MarketPrediction"])
 
 
 @app.on_event("startup")

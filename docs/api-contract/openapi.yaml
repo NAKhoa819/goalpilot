@@ -36,6 +36,82 @@ paths:
   /market/prediction:
     get:
       summary: Get external market context and forecasts
+      parameters:
+        - in: query
+          name: Present_Price
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: Kms_Driven
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: Fuel_Type
+          required: true
+          schema:
+            type: string
+            enum: [Petrol, Diesel, CNG]
+        - in: query
+          name: Seller_Type
+          required: true
+          schema:
+            type: string
+            enum: [Dealer, Individual]
+        - in: query
+          name: Transmission
+          required: true
+          schema:
+            type: string
+            enum: [Manual, Automatic]
+        - in: query
+          name: Owner
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: Year
+          required: true
+          schema:
+            type: integer
       responses:
         '200':
           description: OK
+    post:
+      summary: Predict used-car price from SageMaker XGBoost endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Present_Price
+                - Kms_Driven
+                - Fuel_Type
+                - Seller_Type
+                - Transmission
+                - Owner
+                - Year
+              properties:
+                Present_Price:
+                  type: number
+                Kms_Driven:
+                  type: number
+                Fuel_Type:
+                  type: string
+                  enum: [Petrol, Diesel, CNG]
+                Seller_Type:
+                  type: string
+                  enum: [Dealer, Individual]
+                Transmission:
+                  type: string
+                  enum: [Manual, Automatic]
+                Owner:
+                  type: integer
+                Year:
+                  type: integer
+      responses:
+        '200':
+          description: Prediction completed

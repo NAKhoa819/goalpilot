@@ -42,6 +42,18 @@ BEGIN
 END;
 GO
 
+IF OBJECT_ID('chat_session_state', 'U') IS NULL
+BEGIN
+    CREATE TABLE chat_session_state (
+        session_id VARCHAR(50) PRIMARY KEY,
+        state_json NVARCHAR(MAX) NOT NULL,
+        updated_at DATETIME DEFAULT GETDATE(),
+        FOREIGN KEY (session_id) REFERENCES chat_sessions(session_id) ON DELETE CASCADE,
+        CONSTRAINT chk_chat_session_state_json CHECK (ISJSON(state_json) = 1)
+    );
+END;
+GO
+
 IF OBJECT_ID('transactions', 'U') IS NULL
 BEGIN
     CREATE TABLE transactions (

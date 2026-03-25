@@ -29,6 +29,15 @@ BACKUP_MODEL_ID = os.getenv("BACKUP_MODEL_ID", "llama-3.3-70b-versatile") # e.g.
 # Primary Engine details
 BEDROCK_MODEL = os.getenv("BEDROCK_MODEL", "bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0")
 
+# SageMaker car price model
+SAGEMAKER_REGION = os.getenv("SAGEMAKER_REGION", "us-west-2")
+SAGEMAKER_CAR_PRICE_ENDPOINT_NAME = os.getenv("SAGEMAKER_CAR_PRICE_ENDPOINT_NAME", "").strip()
+SAGEMAKER_CAR_PRICE_CONTENT_TYPE = os.getenv("SAGEMAKER_CAR_PRICE_CONTENT_TYPE", "text/csv")
+CAR_PRICE_MODEL_REFERENCE_YEAR = int(os.getenv("CAR_PRICE_MODEL_REFERENCE_YEAR", "2026"))
+CAR_PRICE_MODEL_OUTPUT_MULTIPLIER_VND = float(
+    os.getenv("CAR_PRICE_MODEL_OUTPUT_MULTIPLIER_VND", "28100000")
+)
+
 # SQL Server connection
 DB_SERVER = os.getenv("DB_SERVER", "localhost\\SQLEXPRESS")
 DB_NAME = os.getenv("DB_NAME", "swinhackathon_db")

@@ -13,13 +13,14 @@ import {
   Platform,
 } from 'react-native';
 import { PenLine, ScanLine, Images } from 'lucide-react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import GoalSlider from '../../components/GoalSlider';
 import FinancialChart from '../../components/FinancialChart';
 import ChatPreview from '../../components/ChatPreview';
 import AppHeader from '../../components/AppHeader';
 import { getCashFlow } from '../../coordinator/cashFlowCoordinator';
 import { getDashboard, submitManualEntry, uploadReceipt } from '../../coordinator/dashboardCoordinator';
+import { getApiBaseUrl } from '../../coordinator/apiClient';
 import type { CashFlowPoint, DashboardData } from '../../coordinator/types';
 import { COLORS } from '../../theme';
 import { FONT_BOLD, FONT_EXTRABOLD } from '../../utils/fonts';
@@ -37,44 +38,57 @@ function parseAmountInput(value: string): number {
 }
 
 const DashboardScreen: React.FC = () => {
+  const navigation = useNavigation();
   const [activeGoalId, setActiveGoalId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [cashFlowPoints, setCashFlowPoints] = useState<CashFlowPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Modal states
   const [entryModalVisible, setEntryModalVisible] = useState(false);
   const [entryType, setEntryType] = useState<'income' | 'expense' | null>(null);
   const [entryAmount, setEntryAmount] = useState('');
 
+  const loadCashFlow = useCallback(async (goalId?: string | null) => {
+    try {
+      const result = await getCashFlow(goalId ?? undefined);
+      if (result.success && result.data) {
+        setCashFlowPoints(result.data.points);
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to load cash flow', error);
+    }
+
+    setCashFlowPoints([]);
+  }, []);
+
   const loadDashboard = useCallback(async () => {
     try {
       setIsLoading(true);
       setIsError(false);
-      const [dashboardRes, cashFlowResult] = await Promise.allSettled([
-        getDashboard(),
-        getCashFlow(),
-      ]);
+      setErrorMessage('');
+      const dashboardRes = await getDashboard();
 
-      if (dashboardRes.status === 'fulfilled' && dashboardRes.value.success && dashboardRes.value.data) {
-        setDashboardData(dashboardRes.value.data);
-        setActiveGoalId(dashboardRes.value.data.active_goal_id);
-
-        if (cashFlowResult.status === 'fulfilled' && cashFlowResult.value.success && cashFlowResult.value.data) {
-          setCashFlowPoints(cashFlowResult.value.data.points);
-        } else {
-          setCashFlowPoints([]);
-        }
+      if (dashboardRes.success && dashboardRes.data) {
+        setDashboardData(dashboardRes.data);
+        setActiveGoalId(dashboardRes.data.active_goal_id);
+        await loadCashFlow(dashboardRes.data.active_goal_id);
       } else {
         setIsError(true);
+        setErrorMessage('Dashboard response did not contain usable data.');
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown dashboard error';
+      console.error('Failed to load dashboard', error);
       setIsError(true);
+      setErrorMessage(message);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadCashFlow]);
 
   const handleQuickAction = async (label: string) => {
     if (label === 'Enter Data') {
@@ -87,6 +101,11 @@ const DashboardScreen: React.FC = () => {
       await uploadReceipt('gallery');
     }
   };
+
+  const handleSelectGoal = useCallback((goalId: string) => {
+    setActiveGoalId(goalId);
+    void loadCashFlow(goalId);
+  }, [loadCashFlow]);
 
   const handleSubmitManual = async () => {
     if (!entryType || !entryAmount) return;
@@ -120,6 +139,9 @@ const DashboardScreen: React.FC = () => {
     return (
       <SafeAreaView style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ fontFamily: FONT_BOLD, color: COLORS.textPrimary }}>Error loading dashboard data.</Text>
+        <Text style={{ marginTop: 8, paddingHorizontal: 24, textAlign: 'center', color: COLORS.textMuted }}>
+          {errorMessage || `Current API base URL: ${getApiBaseUrl()}`}
+        </Text>
       </SafeAreaView>
     );
   }
@@ -143,7 +165,7 @@ const DashboardScreen: React.FC = () => {
         <GoalSlider
           goals={dashboardData.goals}
           activeGoalId={activeGoalId || ''}
-          onSelectGoal={setActiveGoalId}
+          onSelectGoal={handleSelectGoal}
         />
 
         {/* ── Quick Actions ────────────────────────────────── */}
@@ -178,7 +200,7 @@ const DashboardScreen: React.FC = () => {
         </View>
         <ChatPreview
           preview={dashboardData.chat_preview}
-          onPress={() => console.log('Navigate to Agent tab')}
+          onPress={() => navigation.navigate('Agent' as never)}
         />
 
         <View style={{ height: 32 }} />
