@@ -11,6 +11,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ImageBackground,
 } from 'react-native';
 import { PenLine, ScanLine, Images } from 'lucide-react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -149,7 +150,12 @@ const DashboardScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.root}>
+    <ImageBackground
+      source={require('../../../assets/backround-01.png')}
+      style={styles.root}
+      resizeMode="cover"
+    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" translucent={false} />
 
       <ScrollView
@@ -289,6 +295,7 @@ const DashboardScreen: React.FC = () => {
       </Modal>
 
     </SafeAreaView>
+    </ImageBackground>
   );
 };
 

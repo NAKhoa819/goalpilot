@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bot, ChevronRight } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import { ChatPreview as ChatPreviewType } from '../../coordinator/types';
 import { GRADIENTS, COLORS } from '../../theme';
 import { FONT, FONT_BOLD } from '../../utils/fonts';
@@ -29,16 +29,15 @@ const ChatPreview: React.FC<ChatPreviewProps> = ({ preview, onPress }) => {
       />
 
       <View style={styles.innerPad}>
-        {/* Gradient avatar with Bot icon */}
+        {/* Agent avatar */}
         <View style={styles.avatarWrap}>
-          <LinearGradient
-            colors={GRADIENTS.chatAvatar as [string, string, ...string[]]}
-            style={styles.avatarGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Bot size={22} color="#FFFFFF" strokeWidth={2.5} />
-          </LinearGradient>
+          <View style={styles.avatarImageWrap}>
+            <Image
+              source={require('../../../assets/logo.png')}
+              style={styles.avatarImage}
+              resizeMode="contain"
+            />
+          </View>
           {hasUnread && (
             <View style={styles.unreadBadge}>
               <Text style={[styles.unreadText, { fontFamily: FONT_BOLD }]}>

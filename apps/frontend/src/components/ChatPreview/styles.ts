@@ -31,7 +31,6 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    overflow: 'hidden',
     marginRight: 14,
     shadowColor: '#7C6FF7',
     shadowOffset: { width: 0, height: 4 },
@@ -39,10 +38,17 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  avatarGradient: {
+  avatarImageWrap: {
     flex: 1,
+    borderRadius: 26,
+    overflow: 'hidden',
+    backgroundColor: COLORS.bgCardAlt,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: '78%',
+    height: '78%',
   },
   unreadBadge: {
     position: 'absolute',

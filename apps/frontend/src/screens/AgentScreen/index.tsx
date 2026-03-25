@@ -10,6 +10,7 @@ import {
     StatusBar,
     Modal,
     ListRenderItem,
+    ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LiquidGlassView, isLiquidGlassSupported } from '@callstack/liquid-glass';
@@ -149,7 +150,12 @@ const AgentScreen: React.FC = () => {
     );
 
     return (
-        <SafeAreaView style={styles.root}>
+        <ImageBackground
+            source={require('../../../assets/backround-01.png')}
+            style={styles.root}
+            resizeMode="cover"
+        >
+        <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }}>
             <StatusBar barStyle="light-content" backgroundColor="#000000" translucent={false} />
 
             <KeyboardAvoidingView
@@ -299,6 +305,7 @@ const AgentScreen: React.FC = () => {
                 </View>
             </Modal>
         </SafeAreaView>
+        </ImageBackground>
     );
 };
 
