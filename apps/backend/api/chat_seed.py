@@ -7,7 +7,7 @@ from memory.history import ConversationHistory
 def _has_replan_actions(message: dict) -> bool:
     actions = message.get("actions") or []
     action_types = {action.get("type") for action in actions}
-    return "plan_a" in action_types and "plan_b" in action_types
+    return "A" in action_types and "B" in action_types
 
 
 def _pick_at_risk_goal() -> dict | None:
@@ -35,7 +35,7 @@ def _build_replan_actions(goal: dict) -> list[dict]:
 
     return [
         {
-            "type": "plan_a",
+            "type": "A",
             "label": f"Plan A - Tang them {plan_a_amount:,} VND/thang",
             "payload": {
                 "strategy": "increase_savings",
@@ -44,7 +44,7 @@ def _build_replan_actions(goal: dict) -> list[dict]:
             },
         },
         {
-            "type": "plan_b",
+            "type": "B",
             "label": f"Plan B - Doi deadline them {plan_b_months} thang",
             "payload": {
                 "strategy": "extend_deadline",

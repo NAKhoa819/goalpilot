@@ -13,13 +13,13 @@ interface ActionButtonsProps {
 type ButtonVariant = 'plan' | 'accept' | 'reject' | 'default';
 
 function getVariant(type: string): ButtonVariant {
-  if (type === 'plan_a' || type === 'plan_b') return 'plan';
+  if (type === 'A' || type === 'B') return 'plan';
   if (type.startsWith('accept')) return 'accept';
   if (type === 'cancel') return 'reject';
   return 'default';
 }
 
-function getPlanLetter(type: string) { return type === 'plan_a' ? 'A' : 'B'; }
+function getPlanLetter(type: string) { return type; }
 function getPlanSub(label: string) {
   const m = label.match(/—\s*(.+)/);
   return m ? m[1].trim() : label;
@@ -29,7 +29,7 @@ const BigButton: React.FC<{ action: ChatAction; onPress: () => void }> = ({ acti
   const variant = getVariant(action.type);
 
   if (variant === 'plan') {
-    const glowColor = action.type === 'plan_a' ? COLORS.neonCyan : COLORS.neonPurple;
+    const glowColor = action.type === 'A' ? COLORS.neonCyan : COLORS.neonPurple;
     return (
       <TouchableOpacity 
         style={[styles.bigBtn, { 

@@ -38,7 +38,7 @@ export async function handleFileUpload(sourceType: 'camera' | 'gallery' | 'link'
 
 export async function handleActionSelection(action: ChatAction): Promise<{ success: boolean }> {
   console.log('[API BINDING] Thực thi action:', action.type, action.payload);
-  
+
   if (action.type === 'create_goal') {
     const payload = action.payload as any; // Type assertion to bypass strict generic checking for MVP
     return fetchJson<{ success: boolean }>('/api/goals', {
@@ -53,8 +53,8 @@ export async function handleActionSelection(action: ChatAction): Promise<{ succe
       }),
     });
   }
-  
-  // Phase 1: Các hành động khác (plan_a, plan_b) chưa có endpoint thật
+
+  // Phase 1: Các hành động khác (A, B) chưa có endpoint thật
   return { success: true };
 }
 

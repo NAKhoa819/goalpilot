@@ -175,8 +175,8 @@ export const MOCK_CHAT_REPLY: ChatMessageData = {
     role: 'assistant',
     text: 'Cảnh báo: Mục tiêu Mua Laptop đang chậm tiến độ do tháng này bạn chi tiêu lố. Bạn muốn điều chỉnh lộ trình như thế nào?',
     actions: [
-      { type: 'plan_a', label: 'Plan A — Tăng 3tr/tháng', payload: { strategy: 'increase_savings', amount: 3000000 } },
-      { type: 'plan_b', label: 'Plan B — Dời hạn thêm 2 tháng', payload: { strategy: 'extend_deadline', months: 2 } }
+      { type: 'A', label: 'Plan A — Tăng 3tr/tháng', payload: { strategy: 'increase_savings', amount: 3000000 } },
+      { type: 'B', label: 'Plan B — Dời hạn thêm 2 tháng', payload: { strategy: 'extend_deadline', months: 2 } }
     ],
   },
 };

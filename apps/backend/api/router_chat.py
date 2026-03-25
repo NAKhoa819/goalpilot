@@ -49,7 +49,7 @@ def _build_actions_from_strategy(strategy: str) -> list:
 
     return [
         {
-            "type": "plan_a",
+            "type": "A",
             "label": "Plan A - Tang tiet kiem hang thang",
             "payload": {
                 "strategy": "increase_savings",
@@ -58,7 +58,7 @@ def _build_actions_from_strategy(strategy: str) -> list:
             },
         },
         {
-            "type": "plan_b",
+            "type": "B",
             "label": "Plan B - Gia han deadline",
             "payload": {
                 "strategy": "extend_deadline",

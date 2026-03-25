@@ -42,7 +42,7 @@ def get_dashboard():
     active_goal_id = goal_cards[0]["goal_id"] if goal_cards else "g001"
     last_message = messages[-1]["content"] if messages else "How can I help with your financial goals today?"
     last_actions = messages[-1].get("actions", []) if messages else []
-    unread_count = 1 if any(action.get("type") in {"plan_a", "plan_b"} for action in last_actions) else 0
+    unread_count = 1 if any(action.get("type") in {"A", "B"} for action in last_actions) else 0
 
     return {
         "success": True,
