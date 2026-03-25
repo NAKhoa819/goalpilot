@@ -61,7 +61,17 @@ def _get_runtime_client():
                 "boto3 is not installed in the backend environment."
             ) from exc
 
-        _runtime_client = boto3.client("sagemaker-runtime", region_name=settings.SAGEMAKER_REGION)
+        session_kwargs: dict[str, str] = {}
+        if settings.AWS_PROFILE:
+            session_kwargs["profile_name"] = settings.AWS_PROFILE
+        elif settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+            session_kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
+            session_kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
+            if settings.AWS_SESSION_TOKEN:
+                session_kwargs["aws_session_token"] = settings.AWS_SESSION_TOKEN
+
+        session = boto3.session.Session(region_name=settings.SAGEMAKER_REGION, **session_kwargs)
+        _runtime_client = session.client("sagemaker-runtime")
     return _runtime_client
 
 
@@ -96,6 +106,69 @@ def build_feature_vector(body: CarPricePredictionRequest) -> tuple[list[float], 
 
 def _serialize_csv(feature_vector: list[float]) -> str:
     return ",".join(f"{value:g}" for value in feature_vector)
+
+
+def _normalize_json_number(value: float) -> int | float:
+    return int(value) if float(value).is_integer() else float(value)
+
+
+def _json_ready_feature_vector(feature_vector: list[float]) -> list[int | float]:
+    return [_normalize_json_number(value) for value in feature_vector]
+
+
+def _serialize_json(feature_vector: list[float]) -> str:
+    return json.dumps(_json_ready_feature_vector(feature_vector))
+
+
+def _serialize_json_instances(feature_vector: list[float]) -> str:
+    return json.dumps({"instances": [_json_ready_feature_vector(feature_vector)]})
+
+
+def _serialize_json_inputs(feature_vector: list[float]) -> str:
+    return json.dumps({"inputs": [_json_ready_feature_vector(feature_vector)]})
+
+
+def _resolve_request_format(content_type: str) -> str:
+    configured_format = settings.SAGEMAKER_CAR_PRICE_REQUEST_FORMAT
+    if configured_format:
+        return configured_format
+
+    lowered_content_type = (content_type or "").lower()
+    if "json" in lowered_content_type:
+        return "json_instances"
+    return "csv"
+
+
+def _serialize_request_body(feature_vector: list[float], content_type: str) -> str:
+    request_format = _resolve_request_format(content_type)
+
+    if request_format == "csv":
+        return _serialize_csv(feature_vector)
+    if request_format == "json":
+        return _serialize_json(feature_vector)
+    if request_format == "json_instances":
+        return _serialize_json_instances(feature_vector)
+    if request_format == "json_inputs":
+        return _serialize_json_inputs(feature_vector)
+
+    raise PredictorMisconfiguredError(
+        "Unsupported SAGEMAKER_CAR_PRICE_REQUEST_FORMAT. "
+        "Use one of: csv, json, json_instances, json_inputs."
+    )
+
+
+def _build_invoke_kwargs(feature_vector: list[float]) -> dict[str, Any]:
+    content_type = settings.SAGEMAKER_CAR_PRICE_CONTENT_TYPE
+    kwargs: dict[str, Any] = {
+        "EndpointName": settings.SAGEMAKER_CAR_PRICE_ENDPOINT_NAME,
+        "ContentType": content_type,
+        "Body": _serialize_request_body(feature_vector, content_type),
+    }
+
+    if settings.SAGEMAKER_CAR_PRICE_ACCEPT:
+        kwargs["Accept"] = settings.SAGEMAKER_CAR_PRICE_ACCEPT
+
+    return kwargs
 
 
 def _unwrap_prediction(candidate: Any) -> float:
@@ -146,12 +219,7 @@ def predict_car_price(body: CarPricePredictionRequest) -> CarPricePredictionResu
     runtime = _get_runtime_client()
 
     try:
-        response = runtime.invoke_endpoint(
-            EndpointName=settings.SAGEMAKER_CAR_PRICE_ENDPOINT_NAME,
-            ContentType=settings.SAGEMAKER_CAR_PRICE_CONTENT_TYPE,
-            Accept="text/csv",
-            Body=_serialize_csv(feature_vector),
-        )
+        response = runtime.invoke_endpoint(**_build_invoke_kwargs(feature_vector))
     except Exception as exc:
         raise PredictionError(f"Failed to invoke SageMaker endpoint: {exc}") from exc
 

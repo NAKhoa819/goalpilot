@@ -27,6 +27,25 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
+  emptyGoalsCard: {
+    marginHorizontal: 20,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    backgroundColor: COLORS.bgCard,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  emptyGoalsTitle: {
+    fontSize: 18,
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  emptyGoalsBody: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: COLORS.textMuted,
+  },
 
   // ── 3 Flat neon action buttons ─────────────────────────
   quickActions: {

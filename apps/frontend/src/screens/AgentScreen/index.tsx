@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LiquidGlassView, isLiquidGlassSupported } from '@callstack/liquid-glass';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, SendHorizonal, Camera, Image, Link, X } from 'lucide-react-native';
-import { useRoute } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import ChatBubble from '../../components/ChatBubble';
 import AppHeader from '../../components/AppHeader';
 import { getChatSession, postChatMessage, handleFileUpload, handleActionSelection } from '../../coordinator/chatCoordinator';
@@ -43,23 +43,25 @@ const AgentScreen: React.FC = () => {
     const activeGoalId = route.params?.activeGoalId ?? null;
 
     // ── Load session history on mount ─────────────────────────
-    useEffect(() => {
-        const loadSession = async () => {
-            try {
-                setIsTyping(true);
-                const res = await getChatSession(sessionId);
-                if (res.success && res.data) {
-                    setMessages(res.data.messages);
-                }
-            } catch (error) {
-                console.error('Failed to load chat session', error);
-            } finally {
-                setIsTyping(false);
+    const loadSession = useCallback(async () => {
+        try {
+            setIsTyping(true);
+            const res = await getChatSession(sessionId);
+            if (res.success && res.data) {
+                setMessages(res.data.messages);
             }
-        };
-
-        loadSession();
+        } catch (error) {
+            console.error('Failed to load chat session', error);
+        } finally {
+            setIsTyping(false);
+        }
     }, [sessionId]);
+
+    useFocusEffect(
+        useCallback(() => {
+            void loadSession();
+        }, [loadSession]),
+    );
 
     // ── Send a user message ───────────────────────────────────
     const handleSend = useCallback(async () => {

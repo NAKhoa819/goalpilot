@@ -12,8 +12,27 @@ class StrategyResponse(BaseModel):
         description="A concise explanation of why this strategy was chosen based on the Sustainability Index and context."
     )
     remediation_steps: List[str] = Field(
-        ...,
+        ..., 
         description="A list of specific, actionable steps the user can take to execute the strategy."
+    )
+
+
+class AtRiskProposalResponse(BaseModel):
+    risk_summary: str = Field(
+        ...,
+        description="A concise explanation of why the current goal is off track."
+    )
+    plan_a_reason: str = Field(
+        ...,
+        description="A concise explanation of why the increase-savings option is valid."
+    )
+    plan_a_saving_tips: List[str] = Field(
+        default_factory=list,
+        description="Concrete savings ideas the user can try to support Plan A."
+    )
+    plan_b_reason: str = Field(
+        ...,
+        description="A concise explanation of why the deadline-extension option is valid."
     )
 
 

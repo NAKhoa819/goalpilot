@@ -17,6 +17,7 @@ from config.settings import (
     DB_ENCRYPT,
     DB_NAME,
     DB_PASSWORD,
+    DB_SEED_DEFAULT_GOALS,
     DB_SERVER,
     DB_TRUSTED_CONNECTION,
     DB_TRUST_SERVER_CERTIFICATE,
@@ -84,6 +85,9 @@ def _execute_batches(connection: pyodbc.Connection, sql_text: str) -> None:
 
 
 def _seed_default_goals(connection: pyodbc.Connection) -> None:
+    if not DB_SEED_DEFAULT_GOALS:
+        return
+
     cursor = connection.cursor()
     cursor.execute("SELECT COUNT(*) FROM goals")
     existing_count = int(cursor.fetchone()[0])

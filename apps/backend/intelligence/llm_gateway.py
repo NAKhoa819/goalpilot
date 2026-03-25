@@ -1,5 +1,4 @@
 from config import settings
-from models.schemas import StrategyResponse
 
 
 def build_fallback_chat_advice(user_query: str, s_i: float) -> str:
@@ -69,15 +68,27 @@ def get_completion(messages: list, response_format=None, provider=None):
     if model == "mock":
         # Simulate API response for testing the Sustainability Index ($S_i$) without API calls
         if response_format:
-            # LangChain structured output binds and returns the Pydantic model directly
-            return response_format(
-                strategy="A",
-                reasoning="S_i is below 0.8. Client spends excessively on dining out.",
-                remediation_steps=[
-                    "Reduce dining budget by 20%",
-                    "Allocate savings to emergency fund"
-                ]
-            )
+            field_names = set(getattr(response_format, "model_fields", {}).keys())
+            if {"strategy", "reasoning", "remediation_steps"}.issubset(field_names):
+                return response_format(
+                    strategy="A",
+                    reasoning="S_i is below 0.8. Client spends excessively on dining out.",
+                    remediation_steps=[
+                        "Reduce dining budget by 20%",
+                        "Allocate savings to emergency fund"
+                    ]
+                )
+            if {"risk_summary", "plan_a_reason", "plan_a_saving_tips", "plan_b_reason"}.issubset(field_names):
+                return response_format(
+                    risk_summary="Your goal is off track because current savings are not closing the gap quickly enough.",
+                    plan_a_reason="Plan A works if you can free up more money each month and redirect it to this goal.",
+                    plan_a_saving_tips=[
+                        "Trim one flexible spending category this month.",
+                        "Pause a low-value subscription and move that amount to savings.",
+                    ],
+                    plan_b_reason="Plan B works if you want to reduce monthly pressure and spread the goal over a safer timeline.",
+                )
+            return response_format()
         else:
             return "Mock logic tested successfully"
             

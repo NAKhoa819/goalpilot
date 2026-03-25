@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
@@ -17,6 +17,7 @@ import { FONT_BOLD } from './src/utils/fonts';
 const Tab = createBottomTabNavigator();
 
 export default function App() {
+  const [agentScreenInstance, setAgentScreenInstance] = useState(0);
   const [fontsLoaded] = useFonts({
     BeVietnamPro_400Regular,
     BeVietnamPro_700Bold,
@@ -86,9 +87,13 @@ export default function App() {
           />
           <Tab.Screen
             name="Agent"
-            component={AgentScreen}
             options={{ tabBarLabel: 'AI Advisor' }}
-          />
+            listeners={{
+              blur: () => setAgentScreenInstance((current) => current + 1),
+            }}
+          >
+            {() => <AgentScreen key={agentScreenInstance} />}
+          </Tab.Screen>
         </Tab.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

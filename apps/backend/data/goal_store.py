@@ -8,7 +8,7 @@ progress fields that are not persisted in the current schema.
 import uuid
 
 from data.db import execute_non_query, execute_query
-from data.goal_action_store import get_goal_action_state
+from intelligence.intelligence import evaluate_user_context, map_strategy_to_goal_status
 
 _goal_runtime_state: dict[str, dict] = {}
 
@@ -19,21 +19,6 @@ def _progress_percent(goal: dict) -> int:
     if target_amount <= 0:
         return 0
     return int(min(100, (current_saved / target_amount) * 100))
-
-
-def _determine_status(goal: dict, projected_savings: float) -> str:
-    progress_percent = _progress_percent(goal)
-    current_saved = float(goal.get("current_saved", 0))
-
-    if progress_percent >= 100:
-        return "completed"
-    if projected_savings <= 0 and current_saved <= 0:
-        return "paused"
-    if projected_savings <= 0:
-        return "at_risk"
-    if progress_percent >= 60:
-        return "on_track"
-    return "at_risk"
 
 
 def _merge_runtime_state(goal: dict) -> dict:
@@ -91,11 +76,10 @@ def create_goal(
 
 
 def update_goal_target_date(goal_id: str, target_date: str) -> int:
-    """Update a goal target date and mark it as on_track."""
+    """Update a goal target date without overriding intelligence status."""
     _goal_runtime_state.setdefault(goal_id, {})
-    _goal_runtime_state[goal_id]["status"] = "on_track"
     return execute_non_query(
-        "UPDATE goals SET target_date = ?, status = 'on_track' WHERE goal_id = ?",
+        "UPDATE goals SET target_date = ? WHERE goal_id = ?",
         (target_date, goal_id),
     )
 
@@ -108,8 +92,8 @@ def get_goal_ids() -> list[str]:
 
 def sync_goals_with_user_context(user_context: dict) -> list[dict]:
     available_balance = max(0.0, float(user_context.get("balance", 0)))
-    projected_savings = float(user_context.get("projected_savings", 0))
     synced_goals: list[dict] = []
+    strategy = evaluate_user_context(user_context).get("strategy", "None")
 
     for goal in list_goals():
         target_amount = max(0.0, float(goal.get("target_amount", 0)))
@@ -118,10 +102,10 @@ def sync_goals_with_user_context(user_context: dict) -> list[dict]:
 
         runtime_goal = dict(goal)
         runtime_goal["current_saved"] = allocated
-        runtime_goal["status"] = _determine_status(runtime_goal, projected_savings)
-        accepted_plan = get_goal_action_state(goal["goal_id"])
-        if accepted_plan and runtime_goal["status"] != "completed":
-            runtime_goal["status"] = "on_track"
+        runtime_goal["status"] = map_strategy_to_goal_status(
+            strategy,
+            progress_percent=_progress_percent(runtime_goal),
+        )
 
         _goal_runtime_state[goal["goal_id"]] = {
             "current_saved": allocated,

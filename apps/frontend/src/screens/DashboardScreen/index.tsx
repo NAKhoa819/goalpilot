@@ -107,6 +107,8 @@ const DashboardScreen: React.FC = () => {
     void loadCashFlow(goalId);
   }, [loadCashFlow]);
 
+  const hasGoals = (dashboardData?.goals.length ?? 0) > 0;
+
   const handleSubmitManual = async () => {
     if (!entryType || !entryAmount) return;
     const amount = parseAmountInput(entryAmount);
@@ -162,11 +164,24 @@ const DashboardScreen: React.FC = () => {
           <Text style={[styles.sectionTitle, { fontFamily: FONT_EXTRABOLD }]}>Active Goals</Text>
         </View>
 
-        <GoalSlider
-          goals={dashboardData.goals}
-          activeGoalId={activeGoalId || ''}
-          onSelectGoal={handleSelectGoal}
-        />
+        {hasGoals ? (
+          <GoalSlider
+            goals={dashboardData.goals}
+            activeGoalId={activeGoalId || ''}
+            onSelectGoal={handleSelectGoal}
+          />
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.88}
+            style={styles.emptyGoalsCard}
+            onPress={() => navigation.navigate('Agent')}
+          >
+            <Text style={[styles.emptyGoalsTitle, { fontFamily: FONT_EXTRABOLD }]}>No goals yet</Text>
+            <Text style={[styles.emptyGoalsBody, { fontFamily: FONT_BOLD }]}>
+              Open GoalPilot Agent to create your first goal and start tracking progress.
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* ── Quick Actions ────────────────────────────────── */}
         <View style={styles.quickActions}>

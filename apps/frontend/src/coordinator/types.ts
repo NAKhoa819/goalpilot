@@ -1,6 +1,6 @@
 // ============================================================
-// Coordinator Types — FE ↔ BE API Contract
-// Dựa theo: api_contract_dashboard_agent_mvp_detailed.md
+// Coordinator Types - FE <-> BE API Contract
+// Based on: api_contract_dashboard_agent_mvp_detailed.md
 // ============================================================
 
 // ----------------------------------------------------------
@@ -23,39 +23,40 @@ export interface ApiErrorResponse {
 // ----------------------------------------------------------
 export type GoalStatus = 'on_track' | 'at_risk' | 'completed' | 'paused';
 export type WarningLevel = 'info' | 'warning' | 'critical';
+
 /**
- * Strategy BE chọn dựa trên chỉ số Si (Sustainability Index):
- *   Si < 0.5  → B (Goal Realignment)
- *   0.5 ≤ Si < 0.8 → A (Cost Optimization)
- *   Si ≥ 0.8  → None (ổn định, không cần action)
+ * Strategy chosen by BE from the Sustainability Index:
+ *   Si < 0.5      -> B (Goal Realignment)
+ *   0.5 <= Si < 0.8 -> A (Cost Optimization)
+ *   Si >= 0.8     -> None
  */
 export type StrategySelected = 'A' | 'B' | 'None';
 
-/** Payload trả về từ BE sau khi phân tích Si */
 export interface StrategyResponse {
   strategy: StrategySelected;
   reasoning: string;
   remediation_steps: string[];
 }
+
 export type InputSource = 'manual' | 'ocr' | 'sms' | 'file';
 export type GoalType = 'purchase' | 'saving' | 'emergency_fund' | 'custom';
 export type ChatRole = 'user' | 'assistant';
 
 /**
- * Action type trong chat.
- * 'A' = Cost Optimization button (Si 0.5–0.8)
- * 'B' = Goal Re-alignment button (Si < 0.5)
+ * A/B remain internal recommendation types from BE.
+ * User confirms the preselected recommendation with `accept`.
  */
 export type ChatActionType =
-  | 'A'                  // Cost Optimization
-  | 'B'                  // Goal Re-alignment
-  | 'create_goal'        // Tạo goal mới
-  | 'view_goal_progress' // Mở chi tiết tiến trình goal
-  | 'open_input_data'    // Mở form nhập liệu
-  | 'refresh_dashboard'  // Refresh dashboard
-  | 'accept'             // Đồng ý lộ trình
-  | 'cancel'             // Huỷ
-  | (string & {});       // Fallback — không mất type-narrowing
+  | 'A'
+  | 'B'
+  | 'create_goal'
+  | 'view_goal_progress'
+  | 'open_input_data'
+  | 'refresh_dashboard'
+  | 'accept'
+  | 'cancel'
+  | (string & {});
+
 export type GapReason =
   | 'market_price_increase'
   | 'overspending'
@@ -63,20 +64,20 @@ export type GapReason =
   | 'mixed';
 
 // ----------------------------------------------------------
-// 3.1 GoalCard — dùng cho goal slider
+// Goal card for slider
 // ----------------------------------------------------------
 export interface GoalCard {
   goal_id: string;
   goal_name: string;
   target_amount: number;
-  target_date: string; // YYYY-MM-DD
+  target_date: string;
   current_saved: number;
   progress_percent: number;
   status: GoalStatus;
 }
 
 // ----------------------------------------------------------
-// 3.2 ChatPreview — ô chat preview trên dashboard
+// Chat preview
 // ----------------------------------------------------------
 export interface ChatPreview {
   session_id: string;
@@ -85,34 +86,49 @@ export interface ChatPreview {
 }
 
 // ----------------------------------------------------------
-// 3.3 ChatAction — action button trong chat
+// Chat actions
 // ----------------------------------------------------------
-
-/** Payload Plan A: tăng tiết kiệm hàng tháng */
 export interface PlanAPayload {
   goal_id: string;
   strategy: 'increase_savings';
-  amount: number;           // VND tăng thêm mỗi tháng
+  amount: number;
   duration_months?: number;
 }
 
-/** Payload Plan B: gia hạn deadline */
 export interface PlanBPayload {
   goal_id: string;
   strategy: 'extend_deadline';
-  months: number;           // Số tháng gia hạn
-  new_target_date?: string; // YYYY-MM-DD (optional, tính sẵn)
+  months: number;
+  new_target_date?: string;
+}
+
+export interface RecommendationConfirmationPayload {
+  goal_id: string;
+  action: 'confirm_recommended_plan';
+  action_type: 'A' | 'B';
+  action_label?: string;
+  action_payload: PlanAPayload | PlanBPayload;
+}
+
+export interface RecommendationDismissPayload {
+  goal_id: string;
+  action: 'keep_current_plan';
+  action_type: 'A' | 'B';
 }
 
 export interface ChatAction {
   type: ChatActionType;
   label: string;
-  /** A → PlanAPayload | B → PlanBPayload | khác → Record */
-  payload: PlanAPayload | PlanBPayload | Record<string, unknown>;
+  payload:
+    | PlanAPayload
+    | PlanBPayload
+    | RecommendationConfirmationPayload
+    | RecommendationDismissPayload
+    | Record<string, unknown>;
 }
 
 // ----------------------------------------------------------
-// 3.4 ChatMessage — tin nhắn trong tab Agent
+// Chat message
 // ----------------------------------------------------------
 export interface ChatMessage {
   message_id: string;
@@ -122,10 +138,10 @@ export interface ChatMessage {
 }
 
 // ----------------------------------------------------------
-// 3.5 RecommendationOptions
+// Recommendation options
 // ----------------------------------------------------------
 export interface DeadlineExtensionOption {
-  new_target_date: string; // YYYY-MM-DD
+  new_target_date: string;
   delay_days: number;
 }
 
@@ -137,16 +153,12 @@ export interface RecommendationOptions {
   recommended_actions: string[];
   deadline_extension_option?: DeadlineExtensionOption;
   income_augmentation_option?: IncomeAugmentationOption;
-  /**
-   * Khi gap_detected = true, BE điền đủ cả 2 field để FE render
-   * 2 nút Plan A + Plan B trong cùng 1 chat reply.
-   */
-  plan_a_option?: PlanAPayload; // data cho nút Plan A
-  plan_b_option?: PlanBPayload; // data cho nút Plan B
+  plan_a_option?: PlanAPayload;
+  plan_b_option?: PlanBPayload;
 }
 
 // ----------------------------------------------------------
-// 3.6 ProgressGoal
+// Progress goal
 // ----------------------------------------------------------
 export interface ProgressGoal {
   goal_id: string;
@@ -162,7 +174,7 @@ export interface ProgressGoal {
 }
 
 // ----------------------------------------------------------
-// 3.7 ProgressAnalysis
+// Progress analysis
 // ----------------------------------------------------------
 export interface ProgressAnalysis {
   gap_detected: boolean;
@@ -176,7 +188,7 @@ export interface ProgressAnalysis {
 }
 
 // ----------------------------------------------------------
-// 3.8 ProgressUI
+// Progress UI
 // ----------------------------------------------------------
 export interface ProgressUI {
   banner_message: string;
@@ -185,7 +197,7 @@ export interface ProgressUI {
 }
 
 // ----------------------------------------------------------
-// Input action item (dashboard nút nhập dữ liệu)
+// Dashboard input actions
 // ----------------------------------------------------------
 export interface InputAction {
   type: string;
@@ -193,18 +205,19 @@ export interface InputAction {
 }
 
 // ----------------------------------------------------------
-// 4.1 GET /api/dashboard
+// GET /api/dashboard
 // ----------------------------------------------------------
 export interface DashboardData {
   goals: GoalCard[];
-  active_goal_id: string;
+  active_goal_id: string | null;
   chat_preview: ChatPreview;
   input_actions: InputAction[];
 }
+
 export type DashboardResponse = ApiResponse<DashboardData>;
 
 // ----------------------------------------------------------
-// 4.2 GET /api/goals/{goal_id}/progress
+// GET /api/goals/{goal_id}/progress
 // ----------------------------------------------------------
 export interface GoalProgressData {
   goal: ProgressGoal;
@@ -212,10 +225,11 @@ export interface GoalProgressData {
   recommendations: RecommendationOptions;
   ui: ProgressUI;
 }
+
 export type GoalProgressResponse = ApiResponse<GoalProgressData>;
 
 // ----------------------------------------------------------
-// 4.3 POST /api/chat/message
+// POST /api/chat/message
 // ----------------------------------------------------------
 export interface PostChatMessageRequest {
   session_id: string;
@@ -230,19 +244,21 @@ export interface ChatMessageData {
   session_id: string;
   reply: ChatMessage;
 }
+
 export type ChatMessageResponse = ApiResponse<ChatMessageData>;
 
 // ----------------------------------------------------------
-// 4.4 GET /api/chat/session/{session_id}
+// GET /api/chat/session/{session_id}
 // ----------------------------------------------------------
 export interface ChatSessionData {
   session_id: string;
   messages: ChatMessage[];
 }
+
 export type ChatSessionResponse = ApiResponse<ChatSessionData>;
 
 // ----------------------------------------------------------
-// 4.4b POST /api/goals/{goal_id}/actions
+// POST /api/goals/{goal_id}/actions
 // ----------------------------------------------------------
 export interface GoalActionRequest {
   session_id: string;
@@ -259,13 +275,13 @@ export interface GoalActionData {
 export type GoalActionResponse = ApiResponse<GoalActionData>;
 
 // ----------------------------------------------------------
-// 4.5 POST /api/goals
+// POST /api/goals
 // ----------------------------------------------------------
 export interface CreateGoalRequest {
   goal_name: string;
   goal_type: GoalType;
   target_amount: number;
-  target_date: string; // YYYY-MM-DD
+  target_date: string;
   currency: string;
   created_from?: string;
 }
@@ -276,6 +292,7 @@ export interface CreateGoalData {
   progress_percent: number;
   status: GoalStatus;
 }
+
 export type CreateGoalResponse = ApiResponse<CreateGoalData>;
 
 export interface ActionSelectionResult {
@@ -286,7 +303,7 @@ export interface ActionSelectionResult {
 }
 
 // ----------------------------------------------------------
-// 4.6 POST /api/input-data
+// POST /api/input-data
 // ----------------------------------------------------------
 export interface ManualCategoryItem {
   name: string;
@@ -322,24 +339,26 @@ export interface InputDataData {
   affected_goals: string[];
   should_refresh_dashboard: boolean;
 }
+
 export type InputDataResponse = ApiResponse<InputDataData>;
 
 // ----------------------------------------------------------
-// 3.9 CashFlowPoint — điểm dữ liệu dòng tiền mỗi ngày
+// Cash flow
 // ----------------------------------------------------------
 export interface CashFlowPoint {
-  date: string;    // YYYY-MM-DD
-  income: number;  // Tổng thu trong ngày
-  expense: number; // Tổng chi trong ngày
-  net: number;     // income - expense (tính sẵn)
+  date: string;
+  income: number;
+  expense: number;
+  net: number;
 }
 
 // ----------------------------------------------------------
-// 4.7 GET /api/cashflow/weekly
+// GET /api/cashflow/weekly
 // ----------------------------------------------------------
 export interface CashFlowData {
-  period_start: string; // YYYY-MM-DD — ngày đầu tuần
-  period_end: string;   // YYYY-MM-DD — ngày cuối tuần
+  period_start: string;
+  period_end: string;
   points: CashFlowPoint[];
 }
+
 export type CashFlowResponse = ApiResponse<CashFlowData>;

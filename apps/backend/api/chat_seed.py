@@ -1,13 +1,34 @@
-from datetime import datetime, timedelta
+import uuid
 
-from data.goal_store import list_goals
-from memory.history import ConversationHistory
+from data.goal_store import list_goals, sync_goals_with_user_context
+from intelligence.at_risk_guidance import build_at_risk_chat_proposal
+from intelligence.intelligence import evaluate_user_context
+from intelligence.strategy_actions import build_confirmation_actions, build_recommended_action
+from config.settings import resolve_force_strategy
+from memory.history import ConversationHistory, _welcome_message_id
+from memory.retriever import ContextRetriever
+
+
+def _extract_replan_action_type(message: dict) -> str | None:
+    actions = message.get("actions") or []
+    for action in actions:
+        if action.get("type") in {"A", "B"}:
+            return action.get("type")
+        if action.get("type") in {"accept", "cancel"} and (action.get("payload") or {}).get("action_type") in {"A", "B"}:
+            return (action.get("payload") or {}).get("action_type")
+    return None
 
 
 def _has_replan_actions(message: dict) -> bool:
-    actions = message.get("actions") or []
-    action_types = {action.get("type") for action in actions}
-    return "A" in action_types and "B" in action_types
+    return _extract_replan_action_type(message) is not None
+
+
+def _latest_replan_action_type(messages: list[dict]) -> str | None:
+    for message in reversed(messages):
+        action_type = _extract_replan_action_type(message)
+        if action_type is not None:
+            return action_type
+    return None
 
 
 def _pick_at_risk_goal() -> dict | None:
@@ -17,73 +38,48 @@ def _pick_at_risk_goal() -> dict | None:
             return goal
     return goals[0] if goals else None
 
-
-def _extend_target_date(target_date: str, months: int) -> str:
-    try:
-        current = datetime.strptime(target_date, "%Y-%m-%d")
-        return (current + timedelta(days=months * 30)).strftime("%Y-%m-%d")
-    except Exception:
-        return target_date
-
-
-def _build_replan_actions(goal: dict) -> list[dict]:
-    target_amount = float(goal.get("target_amount", 0))
-    current_saved = float(goal.get("current_saved", 0))
-    remaining = max(0, target_amount - current_saved)
-    plan_a_amount = max(500_000, int(remaining / 6)) if remaining else 500_000
-    plan_b_months = 2
-    goal_id = goal.get("goal_id", "")
-
-    return [
-        {
-            "type": "A",
-            "label": f"Plan A - Tang them {plan_a_amount:,} VND/thang",
-            "payload": {
-                "goal_id": goal_id,
-                "strategy": "increase_savings",
-                "amount": plan_a_amount,
-                "duration_months": 6,
-            },
-        },
-        {
-            "type": "B",
-            "label": f"Plan B - Doi deadline them {plan_b_months} thang",
-            "payload": {
-                "goal_id": goal_id,
-                "strategy": "extend_deadline",
-                "months": plan_b_months,
-                "new_target_date": _extend_target_date(
-                    goal.get("target_date", "2026-12-01"),
-                    plan_b_months,
-                ),
-            },
-        },
-    ]
-
-
-def _build_replan_message(goal: dict) -> str:
-    goal_name = goal.get("goal_name", "your goal")
-    return (
-        f"Your {goal_name} goal is currently off track. "
-        "Choose how you want to adjust the plan."
-    )
-
-
 def ensure_chat_seed(session_id: str) -> None:
     ConversationHistory.ensure_session(session_id, seed_welcome=False)
     history = ConversationHistory(session_id)
     messages = history.get_all_messages()
+    forced_strategy = resolve_force_strategy()
 
-    if any(_has_replan_actions(message) for message in messages):
+    if forced_strategy is None and any(_has_replan_actions(message) for message in messages):
         return
 
+    user_context: dict = {}
+    try:
+        user_context = ContextRetriever().fetch_user_financial_context(user_id="user_123")
+        sync_goals_with_user_context(user_context)
+    except Exception:
+        user_context = {}
+
     at_risk_goal = _pick_at_risk_goal()
+    strategy = evaluate_user_context(user_context).get("strategy", "None")
+    latest_action_type = _latest_replan_action_type(messages)
+
     if at_risk_goal and at_risk_goal.get("status") == "at_risk":
+        if strategy not in {"A", "B"}:
+            return
+        if latest_action_type == strategy:
+            return
+
+        recommended_action = build_recommended_action(at_risk_goal, strategy)
+        if recommended_action is None:
+            return
+
+        reply_text, _ = build_at_risk_chat_proposal(
+            at_risk_goal,
+            user_context,
+            [recommended_action],
+            strategy=strategy,
+        )
+        actions = build_confirmation_actions(recommended_action)
         history.add_message(
             "assistant",
-            _build_replan_message(at_risk_goal),
-            actions=_build_replan_actions(at_risk_goal),
-            message_id=f"m_replan_{at_risk_goal.get('goal_id', 'seed')}",
+            reply_text,
+            actions=actions,
+            message_id=f"m_replan_{at_risk_goal.get('goal_id', 'seed')}_{strategy}_{uuid.uuid4().hex[:6]}",
         )
         return
 
@@ -91,5 +87,5 @@ def ensure_chat_seed(session_id: str) -> None:
         history.add_message(
             "assistant",
             "How can I help with your financial goals today?",
-            message_id="m_welcome",
+            message_id=_welcome_message_id(session_id),
         )

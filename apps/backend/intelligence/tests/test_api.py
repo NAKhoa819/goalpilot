@@ -41,11 +41,11 @@ def test_get_dashboard(client):
     d = data["data"]
     assert "goals" in d and "active_goal_id" in d
     assert "chat_preview" in d and "input_actions" in d
-    assert len(d["goals"]) > 0
-    goal = d["goals"][0]
-    for field in ("goal_id", "goal_name", "target_amount", "target_date",
-                  "current_saved", "progress_percent", "status"):
-        assert field in goal, f"Missing GoalCard field: {field}"
+    assert d["active_goal_id"] is None or isinstance(d["active_goal_id"], str)
+    for goal in d["goals"]:
+        for field in ("goal_id", "goal_name", "target_amount", "target_date",
+                      "current_saved", "progress_percent", "status"):
+            assert field in goal, f"Missing GoalCard field: {field}"
 
 
 # ---------------------------------------------------------------------------
@@ -53,7 +53,15 @@ def test_get_dashboard(client):
 # ---------------------------------------------------------------------------
 
 def test_get_goal_progress(client):
-    res = client.get("/api/goals/g001/progress")
+    create_res = client.post("/api/goals", json={
+        "goal_name": "Progress Goal",
+        "goal_type": "saving",
+        "target_amount": 12_000_000,
+        "target_date": "2027-01-01",
+        "currency": "VND",
+    })
+    goal_id = create_res.json()["data"]["goal_id"]
+    res = client.get(f"/api/goals/{goal_id}/progress")
     assert res.status_code == 200
     data = res.json()
     assert data["success"] is True
@@ -66,6 +74,8 @@ def test_get_goal_progress(client):
         assert field in a, f"Missing analysis field: {field}"
     assert isinstance(a["confidence_score"], float)
     assert a["strategy_selected"] in ("A", "B", "None")
+    expected_status = "on_track" if a["strategy_selected"] == "None" else "at_risk"
+    assert d["goal"]["status"] == expected_status
 
 
 def test_get_goal_progress_not_found(client):
@@ -140,6 +150,43 @@ def test_post_chat_message(client):
     assert "text" in reply and "message_id" in reply
 
 
+def test_apply_goal_action_accept_wrapper(client):
+    create_res = client.post("/api/goals", json={
+        "goal_name": "Action Goal",
+        "goal_type": "saving",
+        "target_amount": 10_000_000,
+        "target_date": "2027-01-01",
+        "currency": "VND",
+    })
+    goal_id = create_res.json()["data"]["goal_id"]
+
+    res = client.post(f"/api/goals/{goal_id}/actions", json={
+        "session_id": "s_apply_accept_001",
+        "action": {
+            "type": "accept",
+            "label": "Apply Recommended Plan",
+            "payload": {
+                "goal_id": goal_id,
+                "action": "confirm_recommended_plan",
+                "action_type": "A",
+                "action_label": "Plan A - Save an extra 1,000,000 VND/month",
+                "action_payload": {
+                    "goal_id": goal_id,
+                    "strategy": "increase_savings",
+                    "amount": 1_000_000,
+                    "duration_months": 6,
+                },
+            },
+        },
+    })
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["data"]["applied_action_type"] == "A"
+    assert "Plan A" in data["data"]["reply"]["text"]
+
+
 def test_post_chat_message_empty(client):
     res = client.post("/api/chat/message", json={
         "session_id": "s_test_002",
@@ -198,7 +245,17 @@ def test_get_cashflow_weekly(client):
 
 def test_get_cashflow_weekly_with_goal_id(client):
     dash = client.get("/api/dashboard").json()
-    goal_id = dash["data"]["goals"][0]["goal_id"]
+    if dash["data"]["goals"]:
+        goal_id = dash["data"]["goals"][0]["goal_id"]
+    else:
+        create_res = client.post("/api/goals", json={
+            "goal_name": "Cashflow Goal",
+            "goal_type": "saving",
+            "target_amount": 5_000_000,
+            "target_date": "2027-01-01",
+            "currency": "VND",
+        })
+        goal_id = create_res.json()["data"]["goal_id"]
     res = client.get(f"/api/cashflow/weekly?goal_id={goal_id}")
     assert res.status_code == 200
     assert res.json()["success"] is True

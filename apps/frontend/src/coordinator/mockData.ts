@@ -1,6 +1,5 @@
 // ============================================================
-// Mock Data — Dữ liệu giả cho coordinator
-// Dựa theo: api_contract_dashboard_agent_mvp_detailed.md
+// Mock Data for coordinator layer
 // ============================================================
 
 import type {
@@ -13,9 +12,6 @@ import type {
   CashFlowData,
 } from './types';
 
-// ----------------------------------------------------------
-// Mock: GET /api/dashboard
-// ----------------------------------------------------------
 export const MOCK_DASHBOARD: DashboardData = {
   goals: [
     {
@@ -49,7 +45,7 @@ export const MOCK_DASHBOARD: DashboardData = {
   active_goal_id: 'g001',
   chat_preview: {
     session_id: 's001',
-    last_message: 'Your laptop goal is currently off track.',
+    last_message: 'Your laptop goal is currently at risk.',
     unread_count: 1,
   },
   input_actions: [
@@ -58,9 +54,6 @@ export const MOCK_DASHBOARD: DashboardData = {
   ],
 };
 
-// ----------------------------------------------------------
-// Mock: GET /api/goals/{goal_id}/progress  (default: g001)
-// ----------------------------------------------------------
 export const MOCK_GOAL_PROGRESS: GoalProgressData = {
   goal: {
     goal_id: 'g001',
@@ -71,7 +64,7 @@ export const MOCK_GOAL_PROGRESS: GoalProgressData = {
     remaining_amount: 12_000_000,
     progress_percent: 60,
     planned_eta: '2026-12-01',
-    reprojected_eta: '2027-01-15',
+    reprojected_eta: '2027-03-01',
     status: 'at_risk',
   },
   analysis: {
@@ -80,27 +73,30 @@ export const MOCK_GOAL_PROGRESS: GoalProgressData = {
     gap_reason: 'market_price_increase',
     confidence_score: 0.86,
     strategy_selected: 'B',
+    accepted_action_type: null,
+    accepted_action_payload: null,
     requires_manual_verification: false,
   },
   recommendations: {
-    recommended_actions: ['Extend deadline', 'Increase monthly income target'],
+    recommended_actions: ['GoalPilot recommends extending the deadline by 3 months.'],
     deadline_extension_option: {
       new_target_date: '2027-03-01',
       delay_days: 90,
     },
-    income_augmentation_option: {
-      required_extra_income_per_month: 2_500_000,
+    plan_b_option: {
+      goal_id: 'g001',
+      strategy: 'extend_deadline',
+      months: 3,
+      new_target_date: '2027-03-01',
     },
   },
   ui: {
-    banner_message:
-      'Your goal is currently off track due to market price increase.',
+    banner_message: 'Your goal is currently at risk. GoalPilot recommends Plan B.',
     warning_level: 'warning',
-    cta_buttons: ['Extend Deadline', 'Increase Income Target', 'Review Details'],
+    cta_buttons: ['Review Recommended Plan', 'Review Details'],
   },
 };
 
-/** Per-goal overrides để mock đa goal */
 export const MOCK_GOAL_PROGRESS_MAP: Record<string, GoalProgressData> = {
   g001: MOCK_GOAL_PROGRESS,
   g002: {
@@ -113,7 +109,7 @@ export const MOCK_GOAL_PROGRESS_MAP: Record<string, GoalProgressData> = {
       remaining_amount: 5_000_000,
       progress_percent: 75,
       planned_eta: '2026-09-01',
-      reprojected_eta: '2026-08-15',
+      reprojected_eta: '2026-09-01',
       status: 'on_track',
     },
     analysis: {
@@ -121,7 +117,9 @@ export const MOCK_GOAL_PROGRESS_MAP: Record<string, GoalProgressData> = {
       gap_delta: 0,
       gap_reason: 'overspending',
       confidence_score: 0.92,
-      strategy_selected: 'A',
+      strategy_selected: 'None',
+      accepted_action_type: null,
+      accepted_action_payload: null,
       requires_manual_verification: false,
     },
     recommendations: {
@@ -151,11 +149,13 @@ export const MOCK_GOAL_PROGRESS_MAP: Record<string, GoalProgressData> = {
       gap_delta: 0,
       gap_reason: 'overspending',
       confidence_score: 0.78,
-      strategy_selected: 'A',
+      strategy_selected: 'None',
+      accepted_action_type: null,
+      accepted_action_payload: null,
       requires_manual_verification: false,
     },
     recommendations: {
-      recommended_actions: ['Increase monthly saving by 500,000 VND'],
+      recommended_actions: ['You are making steady progress.'],
     },
     ui: {
       banner_message: "You're making steady progress toward your Japan trip!",
@@ -165,45 +165,54 @@ export const MOCK_GOAL_PROGRESS_MAP: Record<string, GoalProgressData> = {
   },
 };
 
-// ----------------------------------------------------------
-// Mock: POST /api/chat/message
-// ----------------------------------------------------------
 export const MOCK_CHAT_REPLY: ChatMessageData = {
   session_id: 's001',
   reply: {
     message_id: 'm005',
     role: 'assistant',
-    text: 'Cảnh báo: Mục tiêu Mua Laptop đang chậm tiến độ do tháng này bạn chi tiêu lố. Bạn muốn điều chỉnh lộ trình như thế nào?',
+    text: 'Your laptop goal is currently at risk. GoalPilot selected Plan B. Confirm this plan if you want me to apply it.',
     actions: [
       {
-        type: 'A',
-        label: 'Plan A — Tăng 3tr/tháng',
-        payload: { goal_id: 'g001', strategy: 'increase_savings', amount: 3000000 },
+        type: 'accept',
+        label: 'Apply Recommended Plan',
+        payload: {
+          goal_id: 'g001',
+          action: 'confirm_recommended_plan',
+          action_type: 'B',
+          action_label: 'Plan B - Extend deadline by 3 months',
+          action_payload: {
+            goal_id: 'g001',
+            strategy: 'extend_deadline',
+            months: 3,
+            new_target_date: '2027-03-01',
+          },
+        },
       },
       {
-        type: 'B',
-        label: 'Plan B — Dời hạn thêm 2 tháng',
-        payload: { goal_id: 'g001', strategy: 'extend_deadline', months: 2 },
-      }
+        type: 'cancel',
+        label: 'Keep Current Goal',
+        payload: {
+          goal_id: 'g001',
+          action: 'keep_current_plan',
+          action_type: 'B',
+        },
+      },
     ],
   },
 };
 
-// ----------------------------------------------------------
-// Mock: GET /api/chat/session/{session_id}
-// ----------------------------------------------------------
 export const MOCK_CHAT_SESSION: ChatSessionData = {
   session_id: 's001',
   messages: [
     {
       message_id: 'm001',
       role: 'user',
-      text: 'Tôi muốn mua laptop giá 30 triệu.',
+      text: 'I want to buy a laptop worth 30 million.',
     },
     {
       message_id: 'm002',
       role: 'assistant',
-      text: 'Tôi có thể tạo goal này cho bạn.',
+      text: 'I can create that goal for you.',
       actions: [
         {
           type: 'create_goal',
@@ -220,23 +229,43 @@ export const MOCK_CHAT_SESSION: ChatSessionData = {
     {
       message_id: 'm003',
       role: 'user',
-      text: 'Tạo đi.',
+      text: 'Create it.',
     },
     {
       message_id: 'm004',
       role: 'assistant',
-      text: 'Đây là kế hoạch: Tiết kiệm 3.750.000đ/tháng trong 8 tháng. Bạn có đồng ý với lộ trình này không?',
+      text: 'Your laptop goal is currently at risk. GoalPilot selected Plan A. Confirm this plan if you want me to apply it.',
       actions: [
-        { type: 'accept', label: 'Đồng ý', payload: { action: 'confirm' } },
-        { type: 'cancel', label: 'Hủy', payload: { action: 'abort' } }
+        {
+          type: 'accept',
+          label: 'Apply Recommended Plan',
+          payload: {
+            goal_id: 'g001',
+            action: 'confirm_recommended_plan',
+            action_type: 'A',
+            action_label: 'Plan A - Save an extra 2,000,000 VND/month',
+            action_payload: {
+              goal_id: 'g001',
+              strategy: 'increase_savings',
+              amount: 2_000_000,
+              duration_months: 6,
+            },
+          },
+        },
+        {
+          type: 'cancel',
+          label: 'Keep Current Goal',
+          payload: {
+            goal_id: 'g001',
+            action: 'keep_current_plan',
+            action_type: 'A',
+          },
+        },
       ],
     },
   ],
 };
 
-// ----------------------------------------------------------
-// Mock: POST /api/goals
-// ----------------------------------------------------------
 export const MOCK_CREATE_GOAL: CreateGoalData = {
   goal_id: 'g004',
   goal_name: 'New Goal',
@@ -244,19 +273,12 @@ export const MOCK_CREATE_GOAL: CreateGoalData = {
   status: 'on_track',
 };
 
-// ----------------------------------------------------------
-// Mock: POST /api/input-data
-// ----------------------------------------------------------
 export const MOCK_INPUT_DATA: InputDataData = {
   imported_count: 1,
   affected_goals: ['g001', 'g002'],
   should_refresh_dashboard: true,
 };
 
-// ----------------------------------------------------------
-// Mock: GET /api/cashflow/weekly
-// Dữ liệu dòng tiền 7 ngày (08/03 – 14/03/2026)
-// ----------------------------------------------------------
 export const MOCK_CASH_FLOW: CashFlowData = {
   period_start: '2026-03-08',
   period_end: '2026-03-14',

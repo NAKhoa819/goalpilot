@@ -6,7 +6,6 @@ POST /api/goals
 POST /api/goals/{goal_id}/actions
 """
 
-import time
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Optional
@@ -18,9 +17,11 @@ from pydantic import BaseModel
 from data.goal_action_store import get_goal_action_state, upsert_goal_action_state
 from data.goal_store import create_goal as create_goal_entry
 from data.goal_store import get_goal, sync_goals_with_user_context, update_goal_target_date
-from intelligence.intelligence import calculate_metrics, determine_strategy
+from config.settings import resolve_force_strategy
+from intelligence.intelligence import evaluate_user_context, map_strategy_to_goal_status
 from intelligence.llm_gateway import get_completion
 from intelligence.prompts import build_system_prompt
+from intelligence.strategy_actions import build_recommended_action
 from memory.history import ConversationHistory
 from memory.retriever import ContextRetriever
 from models.schemas import StrategyResponse
@@ -137,12 +138,35 @@ def _build_goal_action_reply(goal: dict, action_type: str, payload: dict[str, An
     )
 
 
-def _normalize_goal_action_payload(goal_id: str, goal: dict, action: GoalActionItem) -> dict | JSONResponse:
+def _resolve_goal_action_submission(
+    action: GoalActionItem,
+) -> tuple[str, str, dict[str, Any]] | JSONResponse:
     payload = dict(action.payload or {})
+
+    if action.type in {"A", "B"}:
+        return action.type, action.label, payload
+
+    if action.type == "accept":
+        action_type = payload.get("action_type")
+        action_payload = payload.get("action_payload")
+        if action_type not in {"A", "B"} or not isinstance(action_payload, dict):
+            return _error("Accept payload must wrap a valid A/B recommendation.", "INVALID_ACTION_PAYLOAD")
+        action_label = str(payload.get("action_label") or action.label or action_type)
+        return str(action_type), action_label, dict(action_payload)
+
+    return _error("Only accept, A, and B action types are supported here.", "INVALID_ACTION_TYPE")
+
+
+def _normalize_goal_action_payload(
+    goal_id: str,
+    goal: dict,
+    action_type: str,
+    payload: dict[str, Any],
+) -> dict | JSONResponse:
     if payload.get("goal_id") != goal_id:
         return _error("goal_id in payload must match the target goal.", "GOAL_ACTION_MISMATCH")
 
-    if action.type == "A":
+    if action_type == "A":
         if payload.get("strategy") != "increase_savings":
             return _error("Plan A payload must use increase_savings.", "INVALID_ACTION_PAYLOAD")
 
@@ -162,7 +186,7 @@ def _normalize_goal_action_payload(goal_id: str, goal: dict, action: GoalActionI
             normalized["duration_months"] = duration
         return normalized
 
-    if action.type == "B":
+    if action_type == "B":
         if payload.get("strategy") != "extend_deadline":
             return _error("Plan B payload must use extend_deadline.", "INVALID_ACTION_PAYLOAD")
 
@@ -204,20 +228,13 @@ def get_goal_progress(goal_id: str):
     if goal is None:
         return _error(f"Goal '{goal_id}' not found.", "GOAL_NOT_FOUND", 404)
 
-    accepted_plan = get_goal_action_state(goal_id)
+    force_strategy = resolve_force_strategy()
+    accepted_plan = None if force_strategy is not None else get_goal_action_state(goal_id)
 
-    profile = {
-        "mu_hist": user_context.get("monthly_spending", 4500.0) * 0.9,
-        "sigma_hist": user_context.get("monthly_spending", 4500.0) * 0.15,
-        "beta_prop": user_context.get("monthly_spending", 4500.0),
-        "last_update_timestamp": time.time() - 86400,
-        "data_completeness": 0.85,
-        "market_volatility": 0.3,
-    }
-    metrics = calculate_metrics(profile)
-    s_i = metrics["s_i"]
-    c_s = metrics["c_s"]
-    strategy = determine_strategy(s_i)
+    intelligence = evaluate_user_context(user_context)
+    s_i = intelligence["s_i"]
+    c_s = intelligence["c_s"]
+    strategy = intelligence["strategy"]
 
     gap_detected = strategy != "None"
     warning_level = _determine_warning_level(s_i)
@@ -247,7 +264,7 @@ def get_goal_progress(goal_id: str):
     planned_eta = goal.get("target_date", "2026-12-01")
     delay_months = 3 if strategy == "B" else 1
     reprojected_eta = _calc_reprojected_eta(planned_eta, delay_months) if gap_detected else planned_eta
-    goal_status = "at_risk" if strategy in {"A", "B"} else goal.get("status", "on_track")
+    goal_status = map_strategy_to_goal_status(strategy, progress_percent=progress_pct)
 
     recommendations: dict[str, Any] = {"recommended_actions": remediation_steps}
     accepted_action_type = None
@@ -256,10 +273,7 @@ def get_goal_progress(goal_id: str):
 
     if accepted_plan:
         accepted_action_type = accepted_plan.get("action_type")
-        accepted_action_payload = accepted_plan.get("payload")
-        gap_detected = False
-        warning_level = "info"
-        goal_status = "completed" if progress_pct >= 100 else "on_track"
+        accepted_action_payload = accepted_plan.get("payload") or {}
         banner_message = _build_active_plan_banner(goal, accepted_plan)
         recommendations = {"recommended_actions": [banner_message]}
         if accepted_action_type == "B":
@@ -269,19 +283,11 @@ def get_goal_progress(goal_id: str):
         cta_buttons = ["View Details"]
     else:
         if gap_detected:
-            extra_per_month = int(remaining / max(1, delay_months * 6))
-            recommendations["plan_a_option"] = {
-                "goal_id": goal_id,
-                "strategy": "increase_savings",
-                "amount": extra_per_month,
-                "duration_months": delay_months * 2,
-            }
-            recommendations["plan_b_option"] = {
-                "goal_id": goal_id,
-                "strategy": "extend_deadline",
-                "months": delay_months,
-                "new_target_date": reprojected_eta,
-            }
+            recommended_action = build_recommended_action(goal, strategy)
+            if recommended_action and recommended_action["type"] == "A":
+                recommendations["plan_a_option"] = recommended_action["payload"]
+            if recommended_action and recommended_action["type"] == "B":
+                recommendations["plan_b_option"] = recommended_action["payload"]
 
             if strategy == "B":
                 recommendations["deadline_extension_option"] = {
@@ -289,14 +295,15 @@ def get_goal_progress(goal_id: str):
                     "delay_days": delay_months * 30,
                 }
             if strategy == "A":
+                extra_per_month = 0
+                if recommended_action:
+                    extra_per_month = int(recommended_action["payload"].get("amount", 0))
                 recommendations["income_augmentation_option"] = {
                     "required_extra_income_per_month": extra_per_month,
                 }
 
-        if strategy == "A":
-            cta_buttons = ["Increase Savings", "Review Budget", "Review Details"]
-        elif strategy == "B":
-            cta_buttons = ["Extend Deadline", "Increase Income Target", "Review Details"]
+        if strategy in {"A", "B"}:
+            cta_buttons = ["Review Recommended Plan", "Review Details"]
         else:
             cta_buttons = ["View Details"]
 
@@ -378,11 +385,16 @@ def apply_goal_action(goal_id: str, body: GoalActionRequest):
     if goal is None:
         return _error(f"Goal '{goal_id}' not found.", "GOAL_NOT_FOUND", 404)
 
-    normalized_payload = _normalize_goal_action_payload(goal_id, goal, body.action)
+    action_submission = _resolve_goal_action_submission(body.action)
+    if isinstance(action_submission, JSONResponse):
+        return action_submission
+
+    action_type, action_label, action_payload = action_submission
+    normalized_payload = _normalize_goal_action_payload(goal_id, goal, action_type, action_payload)
     if isinstance(normalized_payload, JSONResponse):
         return normalized_payload
 
-    if body.action.type == "B":
+    if action_type == "B":
         update_goal_target_date(goal_id, normalized_payload["new_target_date"])
         refreshed_goal = get_goal(goal_id)
         if refreshed_goal is not None:
@@ -390,23 +402,23 @@ def apply_goal_action(goal_id: str, body: GoalActionRequest):
 
     upsert_goal_action_state(
         goal_id=goal_id,
-        action_type=body.action.type,
+        action_type=action_type,
         strategy=normalized_payload["strategy"],
         payload=normalized_payload,
     )
 
-    reply_text = _build_goal_action_reply(goal, body.action.type, normalized_payload)
+    reply_text = _build_goal_action_reply(goal, action_type, normalized_payload)
     history = ConversationHistory(body.session_id.strip())
     user_msg_id = f"u_{uuid.uuid4().hex[:8]}"
     assistant_msg_id = f"a_{uuid.uuid4().hex[:8]}"
-    history.add_message("user", body.action.label.strip() or body.action.type, message_id=user_msg_id)
+    history.add_message("user", action_label.strip() or action_type, message_id=user_msg_id)
     history.add_message("assistant", reply_text, message_id=assistant_msg_id)
 
     return {
         "success": True,
         "data": {
             "goal_id": goal_id,
-            "applied_action_type": body.action.type,
+            "applied_action_type": action_type,
             "should_refresh_dashboard": True,
             "reply": {
                 "message_id": assistant_msg_id,

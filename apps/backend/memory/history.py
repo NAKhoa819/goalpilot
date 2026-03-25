@@ -11,6 +11,22 @@ from typing import Optional
 from data.db import execute_query, execute_non_query
 
 
+def _welcome_message_id(session_id: str) -> str:
+    return f"m_welcome_{session_id}"
+
+
+def _ensure_session_row(session_id: str) -> None:
+    execute_non_query(
+        """
+        IF NOT EXISTS (SELECT 1 FROM chat_sessions WHERE session_id = ?)
+        BEGIN
+            INSERT INTO chat_sessions (session_id) VALUES (?)
+        END
+        """,
+        (session_id, session_id),
+    )
+
+
 class ConversationHistory:
     """
     Manages conversation history per session_id.
@@ -19,12 +35,8 @@ class ConversationHistory:
 
     def __init__(self, session_id: str):
         self.session_id = session_id
-        # Auto-create session if it doesn't exist
-        if not self.session_exists(session_id):
-            execute_non_query(
-                "INSERT INTO chat_sessions (session_id) VALUES (?)",
-                (session_id,),
-            )
+        # Auto-create session if it doesn't exist.
+        _ensure_session_row(session_id)
 
     # ------------------------------------------------------------------
     # Static helpers
@@ -41,11 +53,7 @@ class ConversationHistory:
     @staticmethod
     def ensure_session(session_id: str, seed_welcome: bool = False) -> None:
         """Creates a session if it does not exist."""
-        if not ConversationHistory.session_exists(session_id):
-            execute_non_query(
-                "INSERT INTO chat_sessions (session_id) VALUES (?)",
-                (session_id,),
-            )
+        _ensure_session_row(session_id)
 
         if seed_welcome:
             # Check if session has any messages
@@ -54,7 +62,7 @@ class ConversationHistory:
                 (session_id,),
             )
             if not rows:
-                msg_id = "m_welcome"
+                msg_id = _welcome_message_id(session_id)
                 execute_non_query(
                     """
                     INSERT INTO messages (message_id, session_id, role, text)

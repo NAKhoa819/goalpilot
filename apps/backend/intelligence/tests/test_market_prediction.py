@@ -93,6 +93,76 @@ def test_market_prediction_get_supports_contract_query_params(monkeypatch):
     assert data["data"]["feature_vector"] == [7.8, 12000.0, 0.0, 0.0, 0.0, 1.0, 2.0]
 
 
+def test_market_prediction_supports_json_instance_payloads(monkeypatch):
+    app = FastAPI()
+    app.include_router(router, prefix="/api")
+    client = TestClient(app)
+
+    fake_runtime = FakeRuntimeClient('{"predictions":[{"score": 42.5}]}')
+    monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_ENDPOINT_NAME", "car-price-endpoint")
+    monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_CONTENT_TYPE", "application/json")
+    monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_ACCEPT", "application/json")
+    monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_REQUEST_FORMAT", "json_instances")
+    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_REFERENCE_YEAR", 2026)
+    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_OUTPUT_MULTIPLIER_VND", 28_100_000)
+    monkeypatch.setattr(market_prediction, "_runtime_client", fake_runtime)
+
+    res = client.post(
+        "/api/market/prediction",
+        json={
+            "Present_Price": 8.1,
+            "Kms_Driven": 10000,
+            "Fuel_Type": "Petrol",
+            "Seller_Type": "Dealer",
+            "Transmission": "Manual",
+            "Owner": 0,
+            "Year": 2025,
+        },
+    )
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["data"]["raw_model_prediction"] == 42.5
+
+    call = fake_runtime.calls[0]
+    assert call["ContentType"] == "application/json"
+    assert call["Accept"] == "application/json"
+    assert call["Body"] == '{"instances": [[8.1, 10000, 0, 0, 0, 0, 1]]}'
+
+
+def test_market_prediction_omits_accept_header_when_blank(monkeypatch):
+    app = FastAPI()
+    app.include_router(router, prefix="/api")
+    client = TestClient(app)
+
+    fake_runtime = FakeRuntimeClient("77.7")
+    monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_ENDPOINT_NAME", "car-price-endpoint")
+    monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_CONTENT_TYPE", "text/csv")
+    monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_ACCEPT", "")
+    monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_REQUEST_FORMAT", "csv")
+    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_REFERENCE_YEAR", 2026)
+    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_OUTPUT_MULTIPLIER_VND", 28_100_000)
+    monkeypatch.setattr(market_prediction, "_runtime_client", fake_runtime)
+
+    res = client.post(
+        "/api/market/prediction",
+        json={
+            "Present_Price": 6.2,
+            "Kms_Driven": 21000,
+            "Fuel_Type": "Diesel",
+            "Seller_Type": "Individual",
+            "Transmission": "Automatic",
+            "Owner": 1,
+            "Year": 2023,
+        },
+    )
+
+    assert res.status_code == 200
+    call = fake_runtime.calls[0]
+    assert "Accept" not in call
+    assert call["Body"] == "6.2,21000,1,1,1,1,3"
+
+
 def test_market_prediction_rejects_unknown_category(monkeypatch):
     app = FastAPI()
     app.include_router(router, prefix="/api")

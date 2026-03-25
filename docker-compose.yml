@@ -41,6 +41,10 @@ services:
       DB_PASSWORD: "${SQLSERVER_SA_PASSWORD:-YourStrong!Passw0rd}"
       DB_TRUST_SERVER_CERTIFICATE: "yes"
       DB_ENCRYPT: "no"
+      FORCE_STRATEGY: "${FORCE_STRATEGY:-}"
+      RUNTIME_ENV_PATH: "/run/goalpilot/.env"
+    volumes:
+      - ./.env:/run/goalpilot/.env:ro
     ports:
       - "8000:8000"
 

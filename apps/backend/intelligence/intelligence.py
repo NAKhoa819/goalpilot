@@ -1,6 +1,8 @@
 import math
 import time
 
+from config.settings import resolve_force_strategy
+
 def calculate_metrics(profile: dict) -> dict:
     """
     Calculates the Sustainability Index (S_i) and Confidence Score (C_s)
@@ -65,3 +67,31 @@ def determine_strategy(s_i: float) -> str:
         return "A"
     else:
         return "None"
+
+
+def build_profile_from_user_context(user_context: dict) -> dict:
+    monthly_spending = float(user_context.get("monthly_spending", 0.0) or 0.0)
+    return {
+        "mu_hist": monthly_spending * 0.9,
+        "sigma_hist": monthly_spending * 0.15,
+        "beta_prop": monthly_spending,
+        "last_update_timestamp": time.time() - 86400,
+        "data_completeness": 0.85,
+        "market_volatility": 0.3,
+    }
+
+
+def evaluate_user_context(user_context: dict) -> dict:
+    profile = build_profile_from_user_context(user_context)
+    metrics = calculate_metrics(profile)
+    strategy = resolve_force_strategy() or determine_strategy(metrics["s_i"])
+    return {
+        **metrics,
+        "strategy": strategy,
+    }
+
+
+def map_strategy_to_goal_status(strategy: str, progress_percent: int | None = None) -> str:
+    if progress_percent is not None and progress_percent >= 100:
+        return "completed"
+    return "at_risk" if strategy in {"A", "B"} else "on_track"
