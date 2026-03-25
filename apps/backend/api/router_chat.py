@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
 from data.chat_state_store import clear_session_state, get_session_state, set_session_state
+from data.goal_store import get_goal, list_goals, sync_goals_with_user_context
 from intelligence.market_prediction import PredictionError, predict_car_price
 from api.chat_seed import ensure_chat_seed
 from intelligence.intelligence import calculate_metrics, determine_strategy
@@ -76,8 +77,33 @@ def _error(message: str, error_code: str, status_code: int = 400):
     )
 
 
-def _build_actions_from_strategy(strategy: str) -> list:
-    if strategy == "None":
+def _extend_target_date(target_date: str, months: int) -> str:
+    try:
+        current = datetime.strptime(target_date, "%Y-%m-%d")
+        return (current + timedelta(days=months * 30)).strftime("%Y-%m-%d")
+    except Exception:
+        return target_date
+
+
+def _resolve_goal_for_strategy(active_goal_id: str | None) -> dict | None:
+    if active_goal_id:
+        active_goal = get_goal(active_goal_id)
+        if active_goal is not None:
+            return active_goal
+
+    goals = list_goals()
+    for goal in goals:
+        if goal.get("status") == "at_risk":
+            return goal
+    return goals[0] if goals else None
+
+
+def _build_actions_from_strategy(strategy: str, goal: dict | None) -> list:
+    if strategy == "None" or goal is None:
+        return []
+
+    goal_id = goal.get("goal_id")
+    if not goal_id:
         return []
 
     return [
@@ -85,6 +111,7 @@ def _build_actions_from_strategy(strategy: str) -> list:
             "type": "A",
             "label": "Plan A - Tang tiet kiem hang thang",
             "payload": {
+                "goal_id": goal_id,
                 "strategy": "increase_savings",
                 "amount": 2_000_000,
                 "duration_months": 6,
@@ -94,8 +121,10 @@ def _build_actions_from_strategy(strategy: str) -> list:
             "type": "B",
             "label": "Plan B - Gia han deadline",
             "payload": {
+                "goal_id": goal_id,
                 "strategy": "extend_deadline",
                 "months": 3,
+                "new_target_date": _extend_target_date(goal.get("target_date", "2026-12-01"), 3),
             },
         },
     ]
@@ -486,6 +515,7 @@ def post_chat_message(body: PostChatMessageRequest):
             else:
                 retriever = ContextRetriever()
                 user_context = retriever.fetch_user_financial_context(user_id="user_123")
+                sync_goals_with_user_context(user_context)
 
                 try:
                     metrics = calculate_metrics(user_context)
@@ -498,7 +528,9 @@ def post_chat_message(body: PostChatMessageRequest):
                     reply_text = get_chat_advice(user_query=user_text, s_i=s_i)
                 except Exception:
                     reply_text = build_fallback_chat_advice(user_query=user_text, s_i=s_i)
-                actions = _build_actions_from_strategy(strategy)
+                active_goal_id = body.context.active_goal_id if body.context else None
+                goal = _resolve_goal_for_strategy(active_goal_id)
+                actions = _build_actions_from_strategy(strategy, goal)
 
     user_msg_id = f"u_{uuid.uuid4().hex[:8]}"
     assistant_msg_id = f"a_{uuid.uuid4().hex[:8]}"

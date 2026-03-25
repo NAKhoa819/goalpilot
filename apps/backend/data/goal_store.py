@@ -8,6 +8,7 @@ progress fields that are not persisted in the current schema.
 import uuid
 
 from data.db import execute_non_query, execute_query
+from data.goal_action_store import get_goal_action_state
 
 _goal_runtime_state: dict[str, dict] = {}
 
@@ -89,6 +90,16 @@ def create_goal(
     return _merge_runtime_state(goal)
 
 
+def update_goal_target_date(goal_id: str, target_date: str) -> int:
+    """Update a goal target date and mark it as on_track."""
+    _goal_runtime_state.setdefault(goal_id, {})
+    _goal_runtime_state[goal_id]["status"] = "on_track"
+    return execute_non_query(
+        "UPDATE goals SET target_date = ?, status = 'on_track' WHERE goal_id = ?",
+        (target_date, goal_id),
+    )
+
+
 def get_goal_ids() -> list[str]:
     """Return all goal IDs."""
     rows = execute_query("SELECT goal_id FROM goals")
@@ -108,6 +119,9 @@ def sync_goals_with_user_context(user_context: dict) -> list[dict]:
         runtime_goal = dict(goal)
         runtime_goal["current_saved"] = allocated
         runtime_goal["status"] = _determine_status(runtime_goal, projected_savings)
+        accepted_plan = get_goal_action_state(goal["goal_id"])
+        if accepted_plan and runtime_goal["status"] != "completed":
+            runtime_goal["status"] = "on_track"
 
         _goal_runtime_state[goal["goal_id"]] = {
             "current_saved": allocated,

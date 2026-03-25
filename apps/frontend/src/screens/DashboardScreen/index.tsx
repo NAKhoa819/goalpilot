@@ -38,7 +38,7 @@ function parseAmountInput(value: string): number {
 }
 
 const DashboardScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [activeGoalId, setActiveGoalId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [cashFlowPoints, setCashFlowPoints] = useState<CashFlowPoint[]>([]);
@@ -200,7 +200,7 @@ const DashboardScreen: React.FC = () => {
         </View>
         <ChatPreview
           preview={dashboardData.chat_preview}
-          onPress={() => navigation.navigate('Agent' as never)}
+          onPress={() => navigation.navigate('Agent', { activeGoalId: activeGoalId ?? undefined })}
         />
 
         <View style={{ height: 32 }} />

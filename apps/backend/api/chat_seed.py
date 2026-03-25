@@ -32,12 +32,14 @@ def _build_replan_actions(goal: dict) -> list[dict]:
     remaining = max(0, target_amount - current_saved)
     plan_a_amount = max(500_000, int(remaining / 6)) if remaining else 500_000
     plan_b_months = 2
+    goal_id = goal.get("goal_id", "")
 
     return [
         {
             "type": "A",
             "label": f"Plan A - Tang them {plan_a_amount:,} VND/thang",
             "payload": {
+                "goal_id": goal_id,
                 "strategy": "increase_savings",
                 "amount": plan_a_amount,
                 "duration_months": 6,
@@ -47,6 +49,7 @@ def _build_replan_actions(goal: dict) -> list[dict]:
             "type": "B",
             "label": f"Plan B - Doi deadline them {plan_b_months} thang",
             "payload": {
+                "goal_id": goal_id,
                 "strategy": "extend_deadline",
                 "months": plan_b_months,
                 "new_target_date": _extend_target_date(

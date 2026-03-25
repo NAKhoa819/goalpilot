@@ -54,6 +54,21 @@ BEGIN
 END;
 GO
 
+IF OBJECT_ID('goal_action_state', 'U') IS NULL
+BEGIN
+    CREATE TABLE goal_action_state (
+        goal_id VARCHAR(50) PRIMARY KEY,
+        action_type VARCHAR(10) NOT NULL,
+        strategy VARCHAR(50) NOT NULL,
+        payload_json NVARCHAR(MAX) NOT NULL,
+        updated_at DATETIME DEFAULT GETDATE(),
+        FOREIGN KEY (goal_id) REFERENCES goals(goal_id) ON DELETE CASCADE,
+        CONSTRAINT chk_goal_action_type CHECK (action_type IN ('A', 'B')),
+        CONSTRAINT chk_goal_action_payload_json CHECK (ISJSON(payload_json) = 1)
+    );
+END;
+GO
+
 IF OBJECT_ID('transactions', 'U') IS NULL
 BEGIN
     CREATE TABLE transactions (

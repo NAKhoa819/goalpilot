@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LiquidGlassView, isLiquidGlassSupported } from '@callstack/liquid-glass';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, SendHorizonal, Camera, Image, Link, X } from 'lucide-react-native';
+import { useRoute } from '@react-navigation/native';
 import ChatBubble from '../../components/ChatBubble';
 import AppHeader from '../../components/AppHeader';
 import { getChatSession, postChatMessage, handleFileUpload, handleActionSelection } from '../../coordinator/chatCoordinator';
@@ -36,8 +37,10 @@ const AgentScreen: React.FC = () => {
     const [isTyping, setIsTyping] = useState(false);
     const [sheetOpen, setSheetOpen] = useState(false);
     const flatListRef = useRef<FlatList>(null);
+    const route = useRoute<any>();
 
     const sessionId = 's001'; // MVP static session ID
+    const activeGoalId = route.params?.activeGoalId ?? null;
 
     // ── Load session history on mount ─────────────────────────
     useEffect(() => {
@@ -77,7 +80,10 @@ const AgentScreen: React.FC = () => {
             const res = await postChatMessage({
                 session_id: sessionId,
                 message: text,
-                context: { source_screen: 'agent_screen' }
+                context: {
+                    active_goal_id: activeGoalId,
+                    source_screen: 'agent_screen',
+                }
             });
 
             if (res.success && res.data) {
@@ -88,13 +94,10 @@ const AgentScreen: React.FC = () => {
         } finally {
             setIsTyping(false);
         }
-    }, [inputText, sessionId]);
+    }, [activeGoalId, inputText, sessionId]);
 
     // ── Action button press ───────────────────────────────────
     const handleActionPress = useCallback(async (action: ChatAction) => {
-        // Required API binding:
-        await handleActionSelection(action);
-
         const userMsg: ChatMessage = {
             message_id: `m_${Date.now()}`,
             role: 'user',
@@ -105,21 +108,34 @@ const AgentScreen: React.FC = () => {
         setIsTyping(true);
 
         try {
-            const res = await postChatMessage({
-                session_id: sessionId,
-                message: action.label,
-                context: { source_screen: 'agent_action', ...action.payload }
-            });
+            const selection = await handleActionSelection(action, sessionId);
+            const reply = selection.reply;
 
-            if (res.success && res.data) {
-                setMessages((prev) => [...prev, res.data.reply]);
+            if (reply) {
+                setMessages((prev) => [...prev, reply]);
+            }
+
+            if (selection.should_post_chat) {
+                const res = await postChatMessage({
+                    session_id: sessionId,
+                    message: action.label,
+                    context: {
+                        active_goal_id: activeGoalId,
+                        source_screen: 'agent_action',
+                        ...action.payload,
+                    }
+                });
+
+                if (res.success && res.data) {
+                    setMessages((prev) => [...prev, res.data.reply]);
+                }
             }
         } catch (error) {
             console.error('Failed to send action', error);
         } finally {
             setIsTyping(false);
         }
-    }, [sessionId]);
+    }, [activeGoalId, sessionId]);
 
     const handleAttachOption = async (source: 'camera' | 'gallery' | 'link') => {
         setSheetOpen(false);

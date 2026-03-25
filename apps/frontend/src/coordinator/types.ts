@@ -90,6 +90,7 @@ export interface ChatPreview {
 
 /** Payload Plan A: tăng tiết kiệm hàng tháng */
 export interface PlanAPayload {
+  goal_id: string;
   strategy: 'increase_savings';
   amount: number;           // VND tăng thêm mỗi tháng
   duration_months?: number;
@@ -97,6 +98,7 @@ export interface PlanAPayload {
 
 /** Payload Plan B: gia hạn deadline */
 export interface PlanBPayload {
+  goal_id: string;
   strategy: 'extend_deadline';
   months: number;           // Số tháng gia hạn
   new_target_date?: string; // YYYY-MM-DD (optional, tính sẵn)
@@ -105,7 +107,7 @@ export interface PlanBPayload {
 export interface ChatAction {
   type: ChatActionType;
   label: string;
-  /** plan_a → PlanAPayload | plan_b → PlanBPayload | khác → Record */
+  /** A → PlanAPayload | B → PlanBPayload | khác → Record */
   payload: PlanAPayload | PlanBPayload | Record<string, unknown>;
 }
 
@@ -168,6 +170,8 @@ export interface ProgressAnalysis {
   gap_reason: GapReason;
   confidence_score: number;
   strategy_selected: StrategySelected;
+  accepted_action_type?: 'A' | 'B' | null;
+  accepted_action_payload?: PlanAPayload | PlanBPayload | null;
   requires_manual_verification: boolean;
 }
 
@@ -238,6 +242,23 @@ export interface ChatSessionData {
 export type ChatSessionResponse = ApiResponse<ChatSessionData>;
 
 // ----------------------------------------------------------
+// 4.4b POST /api/goals/{goal_id}/actions
+// ----------------------------------------------------------
+export interface GoalActionRequest {
+  session_id: string;
+  action: ChatAction;
+}
+
+export interface GoalActionData {
+  goal_id: string;
+  applied_action_type: 'A' | 'B';
+  should_refresh_dashboard: boolean;
+  reply: ChatMessage;
+}
+
+export type GoalActionResponse = ApiResponse<GoalActionData>;
+
+// ----------------------------------------------------------
 // 4.5 POST /api/goals
 // ----------------------------------------------------------
 export interface CreateGoalRequest {
@@ -256,6 +277,13 @@ export interface CreateGoalData {
   status: GoalStatus;
 }
 export type CreateGoalResponse = ApiResponse<CreateGoalData>;
+
+export interface ActionSelectionResult {
+  success: boolean;
+  should_post_chat: boolean;
+  should_refresh_dashboard?: boolean;
+  reply?: ChatMessage;
+}
 
 // ----------------------------------------------------------
 // 4.6 POST /api/input-data
