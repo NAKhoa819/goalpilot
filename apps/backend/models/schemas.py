@@ -36,6 +36,19 @@ class AtRiskProposalResponse(BaseModel):
     )
 
 
+class CarGoalIntentResponse(BaseModel):
+    is_car_purchase_goal: bool = Field(
+        default=False,
+        description="True when the user message is asking to create or add a goal for buying a car."
+    )
+    confidence_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Model confidence for the car-goal classification."
+    )
+
+
 class CarPricePredictionRequest(BaseModel):
     Present_Price: float = Field(..., ge=0)
     Kms_Driven: float = Field(..., ge=0)

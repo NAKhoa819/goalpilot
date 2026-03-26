@@ -7,16 +7,16 @@ def build_fallback_chat_advice(user_query: str, s_i: float) -> str:
     Keeps chat usable during network, quota, or provider outages.
     """
     if s_i < 0.5:
-        tone = "Tinh hinh tai chinh cua ban dang can duoc dieu chinh ngay."
-        action = "Hay cat giam mot khoan chi tieu khong thiet yeu trong thang nay va uu tien tang tiet kiem."
+        tone = "Your financial situation needs attention right away."
+        action = "Cut one non-essential expense this month and prioritize increasing your savings."
     else:
-        tone = "Tai chinh cua ban dang o muc on dinh."
-        action = "Ban co the tiep tuc bam sat muc tieu va theo doi chi tieu hang tuan de tranh vuot ngan sach."
+        tone = "Your finances look stable overall."
+        action = "Stay close to your goal and review weekly spending so you do not drift over budget."
 
     if user_query.strip():
-        context = f"Ban vua hoi: '{user_query.strip()}'."
+        context = f"You asked: '{user_query.strip()}'."
     else:
-        context = "Ban vua gui mot yeu cau tu van tai chinh."
+        context = "You sent a financial advice request."
 
     return f"{tone} {context} {action}"
 
@@ -87,6 +87,17 @@ def get_completion(messages: list, response_format=None, provider=None):
                         "Pause a low-value subscription and move that amount to savings.",
                     ],
                     plan_b_reason="Plan B works if you want to reduce monthly pressure and spread the goal over a safer timeline.",
+                )
+            if {"is_car_purchase_goal", "confidence_score"}.issubset(field_names):
+                serialized_messages = " ".join(str(message.get("content", "")) for message in messages if isinstance(message, dict))
+                lowered = serialized_messages.lower()
+                is_car_goal = (
+                    "car" in lowered
+                    and any(token in lowered for token in ("buy", "purchase", "goal", "create", "add"))
+                )
+                return response_format(
+                    is_car_purchase_goal=is_car_goal,
+                    confidence_score=0.9 if is_car_goal else 0.1,
                 )
             return response_format()
         else:

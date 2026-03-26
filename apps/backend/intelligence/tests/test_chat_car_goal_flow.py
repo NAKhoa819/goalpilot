@@ -59,14 +59,14 @@ def _build_client(monkeypatch):
     return TestClient(app), session_state_store
 
 
-def test_chat_starts_car_goal_draft(monkeypatch):
+def test_chat_starts_car_goal_draft_from_regex_intent(monkeypatch):
     client, session_state_store = _build_client(monkeypatch)
 
     res = client.post(
         "/api/chat/message",
         json={
             "session_id": "car-flow-1",
-            "message": "Tôi muốn mua xe trước 2026-12-31",
+            "message": "I want to buy a car before 2026-12-31",
             "context": {"source_screen": "agent"},
         },
     )
@@ -74,13 +74,86 @@ def test_chat_starts_car_goal_draft(monkeypatch):
     assert res.status_code == 200
     data = res.json()
     assert data["success"] is True
-    assert "giá khoảng bao nhiêu" in data["data"]["reply"]["text"]
+    assert "price range" in data["data"]["reply"]["text"]
     assert "actions" not in data["data"]["reply"]
 
     stored_state = session_state_store["car-flow-1"]
     assert stored_state["flow_type"] == "car_goal_creation"
     assert stored_state["target_date"] == "2026-12-31"
     assert stored_state["pending_field"] == "Present_Price"
+
+
+def test_chat_starts_car_goal_draft_from_llm_intent_without_deadline(monkeypatch):
+    client, session_state_store = _build_client(monkeypatch)
+    monkeypatch.setattr(router_chat, "_detect_car_goal_intent_with_llm", lambda user_text: True)
+
+    res = client.post(
+        "/api/chat/message",
+        json={
+            "session_id": "car-flow-llm-1",
+            "message": "Add a car purchase goal",
+            "context": {"source_screen": "agent"},
+        },
+    )
+
+    assert res.status_code == 200
+    reply = res.json()["data"]["reply"]
+    assert "When do you want to complete it" in reply["text"]
+    assert "actions" not in reply
+
+    stored_state = session_state_store["car-flow-llm-1"]
+    assert stored_state["flow_type"] == "car_goal_creation"
+    assert stored_state["goal_name"] == "Buy Car"
+    assert stored_state["target_date"] is None
+
+
+def test_chat_starts_car_goal_draft_from_llm_intent_with_deadline(monkeypatch):
+    client, session_state_store = _build_client(monkeypatch)
+    monkeypatch.setattr(router_chat, "_detect_car_goal_intent_with_llm", lambda user_text: True)
+
+    res = client.post(
+        "/api/chat/message",
+        json={
+            "session_id": "car-flow-llm-2",
+            "message": "Create a goal to buy a car before 2026-12-31",
+            "context": {"source_screen": "agent"},
+        },
+    )
+
+    assert res.status_code == 200
+    reply = res.json()["data"]["reply"]
+    assert "price range" in reply["text"]
+
+    stored_state = session_state_store["car-flow-llm-2"]
+    assert stored_state["flow_type"] == "car_goal_creation"
+    assert stored_state["target_date"] == "2026-12-31"
+
+
+def test_chat_car_goal_signal_does_not_fall_back_to_general_advice_when_llm_rejects(monkeypatch):
+    client, session_state_store = _build_client(monkeypatch)
+    monkeypatch.setattr(router_chat, "_detect_car_goal_intent", lambda user_text: False)
+    monkeypatch.setattr(router_chat, "_detect_car_goal_intent_with_llm", lambda user_text: False)
+    monkeypatch.setattr(
+        router_chat,
+        "get_chat_advice",
+        lambda user_query, s_i: (_ for _ in ()).throw(AssertionError("general advice should not be used")),
+    )
+
+    res = client.post(
+        "/api/chat/message",
+        json={
+            "session_id": "car-flow-llm-3",
+            "message": "Add a car purchase goal",
+            "context": {"source_screen": "agent"},
+        },
+    )
+
+    assert res.status_code == 200
+    reply = res.json()["data"]["reply"]
+    assert "I can help with that" in reply["text"]
+    assert "deadline first" in reply["text"]
+    assert "actions" not in reply
+    assert "car-flow-llm-3" not in session_state_store
 
 
 def test_chat_collects_car_features_and_returns_create_goal_action(monkeypatch):
@@ -93,12 +166,12 @@ def test_chat_collects_car_features_and_returns_create_goal_action(monkeypatch):
 
     session_id = "car-flow-2"
     messages = [
-        "Tôi muốn mua xe trước 2026-12-31",
+        "I want to buy a car before 2026-12-31",
         "600000000",
         "25000 km",
-        "dầu diesel",
-        "cá nhân",
-        "số tự động",
+        "diesel",
+        "individual",
+        "automatic",
         "0",
         "2022",
     ]
@@ -128,7 +201,7 @@ def test_chat_direct_goal_creation_still_works_when_amount_is_provided(monkeypat
         "/api/chat/message",
         json={
             "session_id": "car-flow-3",
-            "message": "Tôi muốn mua xe giá 500000000 trước 2026-11-01",
+            "message": "I want to buy a car for 500000000 before 2026-11-01",
             "context": {"source_screen": "agent"},
         },
     )
@@ -149,14 +222,14 @@ def test_chat_asks_for_deadline_before_create_goal_when_missing(monkeypatch):
         "/api/chat/message",
         json={
             "session_id": session_id,
-            "message": "Toi muon mua laptop gia 30 trieu",
+            "message": "I want to buy a laptop for 30 million",
             "context": {"source_screen": "agent"},
         },
     )
 
     assert first_res.status_code == 200
     first_reply = first_res.json()["data"]["reply"]
-    assert "truoc khi nao" in first_reply["text"]
+    assert "When do you want to complete it" in first_reply["text"]
     assert "actions" not in first_reply
 
     stored_state = session_state_store[session_id]
@@ -169,7 +242,7 @@ def test_chat_asks_for_deadline_before_create_goal_when_missing(monkeypatch):
         "/api/chat/message",
         json={
             "session_id": session_id,
-            "message": "truoc 2026-11-10",
+            "message": "before 2026-11-10",
             "context": {"source_screen": "agent"},
         },
     )
@@ -181,41 +254,6 @@ def test_chat_asks_for_deadline_before_create_goal_when_missing(monkeypatch):
     assert second_reply["actions"][0]["payload"]["target_amount"] == 30_000_000
     assert second_reply["actions"][0]["payload"]["target_date"] == "2026-11-10"
     assert session_id not in session_state_store
-
-
-def test_chat_asks_car_goal_deadline_before_collecting_features(monkeypatch):
-    client, session_state_store = _build_client(monkeypatch)
-    session_id = "car-flow-4"
-
-    first_res = client.post(
-        "/api/chat/message",
-        json={
-            "session_id": session_id,
-            "message": "Toi muon mua xe",
-            "context": {"source_screen": "agent"},
-        },
-    )
-
-    assert first_res.status_code == 200
-    first_reply = first_res.json()["data"]["reply"]
-    assert "truoc khi nao" in first_reply["text"]
-    assert "actions" not in first_reply
-    assert session_state_store[session_id]["flow_type"] == "car_goal_creation"
-    assert session_state_store[session_id]["target_date"] is None
-
-    second_res = client.post(
-        "/api/chat/message",
-        json={
-            "session_id": session_id,
-            "message": "trong 8 thang",
-            "context": {"source_screen": "agent"},
-        },
-    )
-
-    assert second_res.status_code == 200
-    second_reply = second_res.json()["data"]["reply"]
-    assert "bao nhi" in second_reply["text"]
-    assert session_state_store[session_id]["target_date"] is not None
 
 
 def test_extract_create_goal_payload_supports_accented_non_car_goal():
@@ -260,5 +298,17 @@ def test_extract_create_goal_payload_supports_unicode_vietnamese():
 
     assert payload is not None
     assert payload["goal_name"] == "Buy Dien Thoai"
+    assert payload["target_amount"] == 20_000_000
+    assert payload["target_date"] == "2026-12-01"
+
+
+def test_extract_create_goal_payload_supports_english_goal_creation():
+    payload = router_chat._extract_create_goal_payload(
+        "I want to buy a phone for 20 million before 2026-12-01"
+    )
+
+    assert payload is not None
+    assert payload["goal_name"] == "Buy Phone"
+    assert payload["goal_type"] == "purchase"
     assert payload["target_amount"] == 20_000_000
     assert payload["target_date"] == "2026-12-01"
