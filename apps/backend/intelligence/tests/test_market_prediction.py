@@ -33,7 +33,7 @@ def test_market_prediction_post_encodes_features(monkeypatch):
     monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_ENDPOINT_NAME", "car-price-endpoint")
     monkeypatch.setattr(settings, "SAGEMAKER_REGION", "us-west-2")
     monkeypatch.setattr(settings, "CAR_PRICE_MODEL_REFERENCE_YEAR", 2026)
-    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_OUTPUT_MULTIPLIER_VND", 28_100_000)
+    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_OUTPUT_MULTIPLIER", 1_000)
     monkeypatch.setattr(market_prediction, "_runtime_client", fake_runtime)
 
     res = client.post(
@@ -52,7 +52,7 @@ def test_market_prediction_post_encodes_features(monkeypatch):
     assert res.status_code == 200
     data = res.json()
     assert data["success"] is True
-    assert data["data"]["predicted_price"] == to_usd_display(3_468_945_000.0)
+    assert data["data"]["predicted_price"] == to_usd_display(123_450.0)
     assert data["data"]["raw_model_prediction"] == 123.45
     assert data["data"]["prediction_unit"] == "USD"
     assert data["data"]["model_input"]["car_age"] == 6
@@ -72,7 +72,7 @@ def test_market_prediction_get_supports_contract_query_params(monkeypatch):
     fake_runtime = FakeRuntimeClient('{"predictions":[88.1]}')
     monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_ENDPOINT_NAME", "car-price-endpoint")
     monkeypatch.setattr(settings, "CAR_PRICE_MODEL_REFERENCE_YEAR", 2026)
-    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_OUTPUT_MULTIPLIER_VND", 28_100_000)
+    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_OUTPUT_MULTIPLIER", 1_000)
     monkeypatch.setattr(market_prediction, "_runtime_client", fake_runtime)
 
     res = client.get(
@@ -90,7 +90,7 @@ def test_market_prediction_get_supports_contract_query_params(monkeypatch):
 
     assert res.status_code == 200
     data = res.json()
-    assert data["data"]["predicted_price"] == to_usd_display(2_475_610_000.0)
+    assert data["data"]["predicted_price"] == to_usd_display(88_100.0)
     assert data["data"]["raw_model_prediction"] == 88.1
     assert data["data"]["feature_vector"] == [from_usd_input(7.8), 12000.0, 0.0, 0.0, 0.0, 1.0, 2.0]
 
@@ -106,7 +106,7 @@ def test_market_prediction_supports_json_instance_payloads(monkeypatch):
     monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_ACCEPT", "application/json")
     monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_REQUEST_FORMAT", "json_instances")
     monkeypatch.setattr(settings, "CAR_PRICE_MODEL_REFERENCE_YEAR", 2026)
-    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_OUTPUT_MULTIPLIER_VND", 28_100_000)
+    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_OUTPUT_MULTIPLIER", 1_000)
     monkeypatch.setattr(market_prediction, "_runtime_client", fake_runtime)
 
     res = client.post(
@@ -145,7 +145,7 @@ def test_market_prediction_omits_accept_header_when_blank(monkeypatch):
     monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_ACCEPT", "")
     monkeypatch.setattr(settings, "SAGEMAKER_CAR_PRICE_REQUEST_FORMAT", "csv")
     monkeypatch.setattr(settings, "CAR_PRICE_MODEL_REFERENCE_YEAR", 2026)
-    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_OUTPUT_MULTIPLIER_VND", 28_100_000)
+    monkeypatch.setattr(settings, "CAR_PRICE_MODEL_OUTPUT_MULTIPLIER", 1_000)
     monkeypatch.setattr(market_prediction, "_runtime_client", fake_runtime)
 
     res = client.post(

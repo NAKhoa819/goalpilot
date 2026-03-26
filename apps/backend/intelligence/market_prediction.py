@@ -205,8 +205,8 @@ def _parse_prediction(body_bytes: bytes) -> float:
     return _unwrap_prediction(parsed)
 
 
-def _scale_prediction_to_vnd(raw_prediction: float) -> float:
-    return float(raw_prediction) * settings.CAR_PRICE_MODEL_OUTPUT_MULTIPLIER_VND
+def _scale_prediction_to_internal_amount(raw_prediction: float) -> float:
+    return float(raw_prediction) * settings.CAR_PRICE_MODEL_OUTPUT_MULTIPLIER
 
 
 def predict_car_price(body: CarPricePredictionRequest) -> CarPricePredictionResult:
@@ -225,7 +225,7 @@ def predict_car_price(body: CarPricePredictionRequest) -> CarPricePredictionResu
 
     raw_prediction = _parse_prediction(response["Body"].read())
     return CarPricePredictionResult(
-        predicted_price=_scale_prediction_to_vnd(raw_prediction),
+        predicted_price=_scale_prediction_to_internal_amount(raw_prediction),
         raw_prediction=raw_prediction,
         feature_vector=feature_vector,
         car_age=car_age,
