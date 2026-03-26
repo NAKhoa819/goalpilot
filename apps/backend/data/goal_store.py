@@ -49,7 +49,7 @@ def create_goal(
     goal_type: str,
     target_amount: float,
     target_date: str,
-    currency: str = "VND",
+    currency: str = "USD",
     created_from: str | None = None,
 ) -> dict:
     """Insert a new goal and return its dict representation."""

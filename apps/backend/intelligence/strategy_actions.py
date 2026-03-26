@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from utils.currency import format_usd
+
 
 def extend_target_date(target_date: str, months: int) -> str:
     try:
@@ -27,7 +29,7 @@ def build_recommended_action(goal: dict | None, strategy: str) -> dict | None:
         extra_per_month = max(500_000, int(remaining / 6)) if remaining else 500_000
         return {
             "type": "A",
-            "label": f"Plan A - Save an extra {extra_per_month:,} VND/month",
+            "label": f"Plan A - Save an extra {format_usd(extra_per_month)}/month",
             "payload": {
                 "goal_id": goal_id,
                 "strategy": "increase_savings",

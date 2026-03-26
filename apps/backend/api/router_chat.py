@@ -26,6 +26,7 @@ from intelligence.strategy_actions import build_confirmation_actions, build_reco
 from memory.history import ConversationHistory
 from memory.retriever import ContextRetriever
 from models.schemas import CarGoalIntentResponse, CarPricePredictionRequest
+from utils.currency import format_usd, usd_to_internal_from_text
 
 router = APIRouter()
 
@@ -40,17 +41,20 @@ CAR_GOAL_REQUIRED_FIELDS = (
 )
 
 CAR_GOAL_QUESTIONS = {
-    "Present_Price": "What price range are you targeting for the car?",
-    "Kms_Driven": "About how many kilometers has the car been driven?",
+    "Present_Price": (
+        "What is the car's original or new selling price in USD? "
+        "This is the model field Present_Price. Example: 25000."
+    ),
+    "Kms_Driven": "About how many kilometers has the car been driven? Example: 45000.",
     "Fuel_Type": "What fuel type does it use: petrol, diesel, or CNG?",
     "Seller_Type": "Are you buying from a dealer or an individual seller?",
     "Transmission": "Is it a manual or automatic transmission?",
-    "Owner": "How many previous owners has the car had?",
-    "Year": "What model year is the car?",
+    "Owner": "How many previous owners has the car had? Example: 0 or 1.",
+    "Year": "What model year is the car? Example: 2022.",
 }
 
 CAR_GOAL_FIELD_LABELS = {
-    "Present_Price": "car price",
+    "Present_Price": "original/new selling price",
     "Kms_Driven": "distance driven",
     "Fuel_Type": "fuel type",
     "Seller_Type": "seller type",
@@ -58,7 +62,6 @@ CAR_GOAL_FIELD_LABELS = {
     "Owner": "number of previous owners",
     "Year": "model year",
 }
-
 
 class ChatContext(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -108,22 +111,22 @@ def _extract_amount(text: str) -> Optional[int]:
     billion_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(ty|ti|billion|bil)\b", lowered)
     if billion_match:
         value = float(billion_match.group(1).replace(",", "."))
-        return int(value * 1_000_000_000)
+        return usd_to_internal_from_text(value * 1_000_000_000)
 
     colloquial_million_match = re.search(r"(\d+(?:[.,]\d+)?)\s*cu\b", lowered)
     if colloquial_million_match:
         value = float(colloquial_million_match.group(1).replace(",", "."))
-        return int(value * 1_000_000)
+        return usd_to_internal_from_text(value * 1_000_000)
 
     million_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(trieu|tr|million|mil)\b", lowered)
     if million_match:
         value = float(million_match.group(1).replace(",", "."))
-        return int(value * 1_000_000)
+        return usd_to_internal_from_text(value * 1_000_000)
 
     raw_match = re.search(r"\b(\d{1,3}(?:[.,]\d{3})+|\d{6,})\b", lowered)
     if raw_match:
         raw_value = re.sub(r"[.,]", "", raw_match.group(1))
-        return int(raw_value)
+        return usd_to_internal_from_text(int(raw_value))
 
     return None
 
@@ -223,6 +226,10 @@ def _get_next_car_field(features: dict) -> Optional[str]:
     return None
 
 
+def _build_car_question(field_name: str) -> str:
+    return CAR_GOAL_QUESTIONS[field_name]
+
+
 def _parse_car_field_value(field_name: str, user_text: str):
     lowered = _normalize_text(user_text)
 
@@ -277,6 +284,15 @@ def _parse_car_field_value(field_name: str, user_text: str):
             return int(match.group(1))
         raise ValueError("I could not read the model year. Example: 2022.")
 
+    if field_name == "Present_Price":
+        amount = _extract_amount(user_text)
+        if amount is not None:
+            return amount
+        number = _extract_decimal_number(user_text)
+        if number is not None:
+            return usd_to_internal_from_text(number)
+        raise ValueError("I could not read the original/new selling price in USD.")
+
     number = _extract_decimal_number(user_text)
     if number is None:
         label = CAR_GOAL_FIELD_LABELS[field_name]
@@ -294,10 +310,6 @@ def _parse_car_field_value(field_name: str, user_text: str):
     return number
 
 
-def _build_car_question(field_name: str) -> str:
-    return CAR_GOAL_QUESTIONS[field_name]
-
-
 def _build_missing_deadline_question(goal_name: str) -> str:
     return (
         f"I understand the goal {goal_name}. "
@@ -306,10 +318,35 @@ def _build_missing_deadline_question(goal_name: str) -> str:
     )
 
 
+def _build_missing_amount_question(goal_name: str) -> str:
+    return (
+        f"I understand the goal {goal_name}. "
+        "What target amount do you want to save in USD? "
+        "For example: 25000 or 25 million."
+    )
+
+
+def _build_goal_pending_fields_question(draft: dict) -> str:
+    goal_name = draft.get("goal_name") or "this goal"
+    missing_amount = draft.get("target_amount") is None
+    missing_deadline = not draft.get("target_date")
+
+    if missing_amount and missing_deadline:
+        return (
+            f"I understand the goal {goal_name}. "
+            "Tell me the target amount in USD and the deadline. "
+            "For example: 25000 before 2026-12-31."
+        )
+    if missing_amount:
+        return _build_missing_amount_question(goal_name)
+    return _build_missing_deadline_question(goal_name)
+
+
 def _build_car_goal_clarification(goal_name: str) -> str:
     return (
         f"If you want to create the goal {goal_name}, I can help with that. "
-        "Tell me the deadline first, for example 2026-12-31 or in 8 months."
+        "Tell me the deadline first. After that I will ask the used-car model inputs: "
+        "Present_Price, Kms_Driven, Fuel_Type, Seller_Type, Transmission, Owner, and Year."
     )
 
 
@@ -322,6 +359,7 @@ def _build_create_goal_action(payload: dict) -> dict:
             "goal_type": payload["goal_type"],
             "target_amount": payload["target_amount"],
             "target_date": payload["target_date"],
+            "currency": "USD",
         },
     }
 
@@ -347,7 +385,9 @@ def _complete_car_goal_flow(session_id: str, draft: dict) -> tuple[str, list]:
     target_date = action["payload"]["target_date"]
 
     reply_text = (
-        f"I estimate the car price at about {target_amount:,} VND. "
+        "I collected all required used-car model features "
+        "(Present_Price, Kms_Driven, Fuel_Type, Seller_Type, Transmission, Owner, Year). "
+        f"I estimate the used-car price at about {format_usd(target_amount)}. "
         f"If that looks right, tap Create Goal to save the goal with target date {target_date}."
     )
     return reply_text, [action]
@@ -355,9 +395,139 @@ def _complete_car_goal_flow(session_id: str, draft: dict) -> tuple[str, list]:
 
 def _car_prediction_unavailable_message() -> str:
     return (
-        "I collected the required car details, but the price prediction model is not available right now. "
-        "Please check the SageMaker configuration or enter the target amount directly in chat."
+        "I collected the required used-car model features, but the price prediction model is not available right now. "
+        "Please check the SageMaker configuration or try again later."
     )
+
+
+def _extract_target_date(text: str) -> Optional[str]:
+    explicit_date = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text)
+    if explicit_date:
+        return explicit_date.group(1)
+
+    normalized_text = _normalize_text(text)
+    months_match = re.search(r"(\d+)\s*(thang|month|months)\b", normalized_text)
+    if months_match:
+        months = int(months_match.group(1))
+        return (datetime.today() + timedelta(days=months * 30)).strftime("%Y-%m-%d")
+
+    return None
+
+
+def _infer_goal_name_and_type(text: str) -> tuple[str, str]:
+    lowered = _normalize_text(text)
+
+    if "laptop" in lowered:
+        return "Buy Laptop", "purchase"
+    if any(keyword in lowered for keyword in ("mua xe", "o to", "oto", "xe hoi", "buy car", "buy a car", "purchase car")):
+        return "Buy Car", "purchase"
+    if "car" in lowered and any(keyword in lowered for keyword in ("buy", "purchase", "goal", "create", "add")):
+        return "Buy Car", "purchase"
+    if any(keyword in lowered for keyword in ("emergency fund", "quy khan cap")):
+        return "Emergency Fund", "emergency_fund"
+    if any(keyword in lowered for keyword in ("du lich", "travel", "trip")):
+        return "Travel Goal", "saving"
+
+    purchase_patterns = (
+        r"mua\s+(.+?)(?:\s+gia|\s+\d|\s+truoc|\s+trong|\s+by|\s+before|\s+in\s+\d+\s*(?:month|months|thang)|$)",
+        r"(?:buy|purchase)\s+(?:a|an|the)?\s*(.+?)(?:\s+for|\s+worth|\s+costing|\s+\d|\s+by|\s+before|\s+in\s+\d+\s*months?|$)",
+    )
+    for pattern in purchase_patterns:
+        purchase_match = re.search(pattern, lowered)
+        if purchase_match:
+            subject = purchase_match.group(1).strip(" .,!?")
+            if subject:
+                return f"Buy {subject.title()}", "purchase"
+
+    return "New Goal", "custom"
+
+
+def _is_car_goal_text(user_text: str) -> bool:
+    goal_name, _ = _infer_goal_name_and_type(user_text)
+    return goal_name == "Buy Car"
+
+
+def _extract_create_goal_payload(user_text: str) -> Optional[dict]:
+    lowered = _normalize_text(user_text)
+    if not any(
+        keyword in lowered
+        for keyword in (
+            "mua",
+            "buy",
+            "purchase",
+            "goal",
+            "muc tieu",
+            "tiet kiem",
+            "save",
+            "saving",
+            "quy khan cap",
+            "emergency fund",
+            "travel",
+            "trip",
+            "du lich",
+        )
+    ):
+        return None
+
+    if _is_car_goal_text(user_text):
+        return None
+
+    amount = _extract_amount(user_text)
+    if amount is None:
+        return None
+
+    goal_name, goal_type = _infer_goal_name_and_type(user_text)
+    return {
+        "goal_name": goal_name,
+        "goal_type": goal_type,
+        "target_amount": amount,
+        "target_date": _extract_target_date(user_text),
+    }
+
+
+def _build_goal_acknowledgement(context: ChatContext | None) -> str:
+    payload = context.model_dump() if context else {}
+    goal_name = payload.get("goal_name") or "your goal"
+    target_amount = payload.get("target_amount")
+    target_date = payload.get("target_date")
+
+    details = []
+    if target_amount:
+        details.append(f"target amount {format_usd(target_amount)}")
+    if target_date:
+        details.append(f"target date {target_date}")
+
+    suffix = f" with {', '.join(details)}" if details else ""
+    return f"I have created {goal_name}{suffix}. You can review it from the dashboard."
+
+
+def _handle_pending_goal_fields(session_id: str, user_text: str, draft: dict) -> tuple[str, list]:
+    if _is_cancel_intent(user_text):
+        clear_session_state(session_id)
+        return "I canceled this goal creation flow. Start again whenever you want.", []
+
+    target_amount = draft.get("target_amount")
+    if target_amount is None:
+        target_amount = _extract_amount(user_text)
+
+    target_date = _extract_target_date(user_text)
+    if target_date is not None:
+        draft["target_date"] = target_date
+    if target_amount is not None:
+        draft["target_amount"] = target_amount
+
+    if draft.get("target_amount") is None or not draft.get("target_date"):
+        set_session_state(session_id, draft)
+        return _build_goal_pending_fields_question(draft), []
+
+    clear_session_state(session_id)
+    action = _build_create_goal_action(draft)
+    reply_text = (
+        "I have enough information for this goal. "
+        f"If this looks right, tap Create Goal to save it with target amount {format_usd(draft['target_amount'])} "
+        f"and target date {draft['target_date']}."
+    )
+    return reply_text, [action]
 
 
 def _handle_active_car_goal_draft(session_id: str, user_text: str, draft: dict) -> tuple[str, list]:
@@ -404,121 +574,6 @@ def _handle_active_car_goal_draft(session_id: str, user_text: str, draft: dict) 
     return _build_car_question(next_field), []
 
 
-def _extract_target_date(text: str) -> Optional[str]:
-    explicit_date = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text)
-    if explicit_date:
-        return explicit_date.group(1)
-
-    normalized_text = _normalize_text(text)
-    months_match = re.search(r"(\d+)\s*(thang|month|months)\b", normalized_text)
-    if months_match:
-        months = int(months_match.group(1))
-        return (datetime.today() + timedelta(days=months * 30)).strftime("%Y-%m-%d")
-
-    return None
-
-
-def _infer_goal_name_and_type(text: str) -> tuple[str, str]:
-    lowered = _normalize_text(text)
-
-    if "laptop" in lowered:
-        return "Buy Laptop", "purchase"
-    if any(keyword in lowered for keyword in ("mua xe", "o to", "oto", "xe hoi", "buy car", "buy a car", "purchase car")):
-        return "Buy Car", "purchase"
-    if "car" in lowered and any(keyword in lowered for keyword in ("buy", "purchase", "goal", "create", "add")):
-        return "Buy Car", "purchase"
-    if any(keyword in lowered for keyword in ("emergency fund", "quy khan cap")):
-        return "Emergency Fund", "emergency_fund"
-    if any(keyword in lowered for keyword in ("du lich", "travel", "trip")):
-        return "Travel Goal", "saving"
-
-    purchase_patterns = (
-        r"mua\s+(.+?)(?:\s+gia|\s+\d|\s+truoc|\s+trong|\s+by|\s+before|\s+in\s+\d+\s*(?:month|months|thang)|$)",
-        r"(?:buy|purchase)\s+(?:a|an|the)?\s*(.+?)(?:\s+for|\s+worth|\s+costing|\s+\d|\s+by|\s+before|\s+in\s+\d+\s*months?|$)",
-    )
-    for pattern in purchase_patterns:
-        purchase_match = re.search(pattern, lowered)
-        if purchase_match:
-            subject = purchase_match.group(1).strip(" .,!?")
-            if subject:
-                return f"Buy {subject.title()}", "purchase"
-
-    return "New Goal", "custom"
-
-
-def _extract_create_goal_payload(user_text: str) -> Optional[dict]:
-    lowered = _normalize_text(user_text)
-    if not any(
-        keyword in lowered
-        for keyword in (
-            "mua",
-            "buy",
-            "purchase",
-            "goal",
-            "muc tieu",
-            "tiet kiem",
-            "save",
-            "saving",
-            "quy khan cap",
-            "emergency fund",
-            "travel",
-            "trip",
-            "du lich",
-        )
-    ):
-        return None
-
-    amount = _extract_amount(user_text)
-    if amount is None:
-        return None
-
-    goal_name, goal_type = _infer_goal_name_and_type(user_text)
-    return {
-        "goal_name": goal_name,
-        "goal_type": goal_type,
-        "target_amount": amount,
-        "target_date": _extract_target_date(user_text),
-    }
-
-
-def _build_goal_acknowledgement(context: ChatContext | None) -> str:
-    payload = context.model_dump() if context else {}
-    goal_name = payload.get("goal_name") or "your goal"
-    target_amount = payload.get("target_amount")
-    target_date = payload.get("target_date")
-
-    details = []
-    if target_amount:
-        details.append(f"target amount {target_amount:,} VND")
-    if target_date:
-        details.append(f"target date {target_date}")
-
-    suffix = f" with {', '.join(details)}" if details else ""
-    return f"I have created {goal_name}{suffix}. You can review it from the dashboard."
-
-
-def _handle_pending_goal_deadline(session_id: str, user_text: str, draft: dict) -> tuple[str, list]:
-    if _is_cancel_intent(user_text):
-        clear_session_state(session_id)
-        return "I canceled this goal creation flow. Start again whenever you want.", []
-
-    target_date = _extract_target_date(user_text)
-    if target_date is None:
-        return _build_missing_deadline_question(draft.get("goal_name") or "this goal"), []
-
-    completed_draft = {
-        **draft,
-        "target_date": target_date,
-    }
-    clear_session_state(session_id)
-    action = _build_create_goal_action(completed_draft)
-    reply_text = (
-        "I have enough information for this goal. "
-        f"If this looks right, tap Create Goal to save it with target date {target_date}."
-    )
-    return reply_text, [action]
-
-
 def _build_plan_acknowledgement(context: ChatContext | None) -> str:
     payload = context.model_dump() if context else {}
     action_type = payload.get("action_type")
@@ -529,7 +584,7 @@ def _build_plan_acknowledgement(context: ChatContext | None) -> str:
         duration = action_payload.get("duration_months")
         details = []
         if amount:
-            details.append(f"save an extra {amount:,} VND per month")
+            details.append(f"save an extra {format_usd(amount)} per month")
         if duration:
             details.append(f"for the next {duration} months")
         suffix = f" by {' '.join(details)}" if details else ""
@@ -578,8 +633,27 @@ def post_chat_message(body: PostChatMessageRequest):
             reply_text = "I noted your action. Let me know if you want to refine the plan further."
     else:
         session_state = get_session_state(session_id) or {}
-        if session_state.get("flow_type") == "goal_creation_pending_deadline":
-            reply_text, actions = _handle_pending_goal_deadline(session_id, user_text, session_state)
+        if session_state.get("flow_type") in {"goal_creation_pending_deadline", "goal_creation_pending_fields"}:
+            if (session_state.get("goal_name") or "") == "Buy Car":
+                migrated_state = {
+                    "flow_type": "car_goal_creation",
+                    "goal_name": "Buy Car",
+                    "goal_type": session_state.get("goal_type") or "purchase",
+                    "target_date": session_state.get("target_date"),
+                    "features": {},
+                    "pending_field": CAR_GOAL_REQUIRED_FIELDS[0],
+                }
+                set_session_state(session_id, migrated_state)
+                if migrated_state.get("target_date"):
+                    reply_text = (
+                        "This used-car pricing model needs 7 inputs: Present_Price, Kms_Driven, Fuel_Type, "
+                        "Seller_Type, Transmission, Owner, and Year. "
+                        f"{_build_car_question(migrated_state['pending_field'])}"
+                    )
+                else:
+                    reply_text = _build_missing_deadline_question(migrated_state["goal_name"])
+            else:
+                reply_text, actions = _handle_pending_goal_fields(session_id, user_text, session_state)
         elif session_state.get("flow_type") == "car_goal_creation":
             reply_text, actions = _handle_active_car_goal_draft(session_id, user_text, session_state)
         else:
@@ -588,12 +662,13 @@ def post_chat_message(body: PostChatMessageRequest):
             if not car_goal_intent and car_goal_signal:
                 car_goal_intent = _detect_car_goal_intent_with_llm(user_text)
 
-            if car_goal_intent and _extract_amount(user_text) is None:
+            if car_goal_intent:
                 draft = _build_car_goal_draft(user_text)
                 set_session_state(session_id, draft)
                 if draft.get("target_date"):
                     reply_text = (
-                        "To create a car goal based on a predicted price, I need a few details about the car. "
+                        "This used-car pricing model needs 7 inputs: Present_Price, Kms_Driven, Fuel_Type, "
+                        "Seller_Type, Transmission, Owner, and Year. "
                         f"{_build_car_question(draft['pending_field'])}"
                     )
                 else:
@@ -610,11 +685,11 @@ def post_chat_message(body: PostChatMessageRequest):
                     set_session_state(
                         session_id,
                         {
-                            "flow_type": "goal_creation_pending_deadline",
+                            "flow_type": "goal_creation_pending_fields",
                             **create_goal_payload,
                         },
                     )
-                    reply_text = _build_missing_deadline_question(create_goal_payload["goal_name"])
+                    reply_text = _build_goal_pending_fields_question(create_goal_payload)
                 elif car_goal_signal:
                     goal_name, _ = _infer_goal_name_and_type(user_text)
                     clear_session_state(session_id)

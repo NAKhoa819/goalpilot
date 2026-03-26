@@ -25,6 +25,7 @@ from intelligence.strategy_actions import build_recommended_action
 from memory.history import ConversationHistory
 from memory.retriever import ContextRetriever
 from models.schemas import StrategyResponse
+from utils.currency import format_usd
 
 router = APIRouter()
 
@@ -34,7 +35,7 @@ class CreateGoalRequest(BaseModel):
     goal_type: str
     target_amount: float
     target_date: str
-    currency: str = "VND"
+    currency: str = "USD"
     created_from: Optional[str] = None
 
 
@@ -108,7 +109,7 @@ def _build_active_plan_banner(goal: dict, accepted_plan: dict) -> str:
         duration_text = f" for the next {duration} months" if duration else ""
         return (
             f"Plan A is active for {goal_name}. "
-            f"Save an extra {amount:,} VND per month{duration_text} to stay on track."
+            f"Save an extra {format_usd(amount)} per month{duration_text} to stay on track."
         )
 
     new_target_date = payload.get("new_target_date") or goal.get("target_date", "2026-12-01")
@@ -128,7 +129,7 @@ def _build_goal_action_reply(goal: dict, action_type: str, payload: dict[str, An
         duration_text = f" for the next {duration} months" if duration else ""
         return (
             f"Plan A is now active for {goal_name}. "
-            f"Aim to save an extra {amount:,} VND per month{duration_text}."
+            f"Aim to save an extra {format_usd(amount)} per month{duration_text}."
         )
 
     new_target_date = payload.get("new_target_date") or goal.get("target_date", "2026-12-01")

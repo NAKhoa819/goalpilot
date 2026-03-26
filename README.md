@@ -1,53 +1,53 @@
 # GoalPilot
 
-Monorepo gồm:
+Monorepo structure:
 - `apps/backend`: FastAPI backend
 - `apps/frontend`: React Native / Expo frontend
-- `docs`: tài liệu dự án
-- `infra`: hạ tầng và deployment
-- `packages`: shared packages nếu cần
+- `docs`: project documentation
+- `infra`: infrastructure and deployment
+- `packages`: shared packages if needed
 
-## Yêu cầu
+## Requirements
 
-Chạy local:
+For local development:
 - Python 3.11+
 - Node.js 18+
 - SQL Server Express
 - ODBC Driver 17 for SQL Server
 
-Chạy bằng Docker:
+For Docker:
 - Docker Desktop
 
-## Khởi tạo từ đầu
+## Initial Setup
 
-Tại thư mục gốc repo:
+From the repository root:
 
 ```powershell
 git clone <repo-url>
 cd goalpilot
 ```
 
-Tạo file env từ mẫu:
+Create `.env` from the example:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Nếu dùng Git Bash hoặc WSL:
+If you use Git Bash or WSL:
 
 ```bash
 cp .env.example .env
 ```
 
-Sau đó chỉnh lại các biến trong `.env`, tối thiểu:
+Then update the required values in `.env`, at minimum:
 - `EXPO_PUBLIC_API_URL`
 - `ACTIVE_LLM_PROVIDER`, `BACKUP_PROVIDER`, `BACKUP_MODEL_ID`
-- `GOOGLE_API_KEY` hoặc `GROQ_API_KEY` nếu dùng provider thật
+- `GOOGLE_API_KEY` or `GROQ_API_KEY` if you use a real provider
 - `DB_SERVER`
 
-## Chạy local
+## Run Locally
 
-### 1. Cài backend
+### 1. Install Backend Dependencies
 
 ```powershell
 python -m venv venv
@@ -55,9 +55,9 @@ python -m venv venv
 pip install -r apps/backend/requirements.txt
 ```
 
-### 2. Cấu hình database local
+### 2. Configure Local Database
 
-Mặc định backend local dùng:
+By default, the local backend uses:
 
 ```env
 DB_SERVER=localhost\SQLEXPRESS
@@ -68,85 +68,85 @@ DB_TRUST_SERVER_CERTIFICATE=yes
 DB_ENCRYPT=no
 ```
 
-Khi backend khởi động, app sẽ tự:
-- tạo database `swinhackathon_db` nếu chưa có
-- tạo schema cần thiết
-- seed dữ liệu goal mặc định
+When the backend starts, it will automatically:
+- create the `swinhackathon_db` database if it does not exist
+- create the required schema
+- seed default goal data
 
-### 3. Chạy backend
+### 3. Run Backend
 
 ```powershell
 cd apps/backend
 ..\..\venv\Scripts\python -m uvicorn main_api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Backend:
+Backend URLs:
 - API: `http://localhost:8000`
 - Swagger: `http://localhost:8000/docs`
 
-### 4. Cài frontend
+### 4. Install Frontend Dependencies
 
-Mở terminal khác tại root repo:
+Open another terminal at the repo root:
 
 ```powershell
 cd apps/frontend
 npm install
 ```
 
-### 5. Chạy frontend
+### 5. Run Frontend
 
-Trong `.env`, đặt:
+In `.env`, set:
 
 ```env
-EXPO_PUBLIC_API_URL=http://<IP_MAY_CUA_BAN>:8000
+EXPO_PUBLIC_API_URL=http://<YOUR_MACHINE_IP>:8000
 ```
 
-Ví dụ nếu test bằng điện thoại qua Expo Go, dùng IP LAN của máy thay vì `localhost`.
+If you test on a phone using Expo Go, use your machine's LAN IP instead of `localhost`.
 
-Chạy app:
+Run the app:
 
 ```powershell
 cd apps/frontend
 npm start
 ```
 
-## Chạy bằng Docker
+## Run With Docker
 
-Docker Compose sẽ chạy:
-- SQL Server Express container
+Docker Compose runs:
+- SQL Server container
 - backend container
 
-Tại thư mục gốc repo:
+From the repo root:
 
 ```powershell
 docker compose up --build
 ```
 
-Khi chạy bằng Docker:
-- backend lên tại `http://localhost:8000`
-- SQL Server lên tại port `1433`
-- backend tự tạo database `swinhackathon_db` và schema khi startup
+When running with Docker:
+- backend is available at `http://localhost:8000`
+- SQL Server is available on port `1433`
+- backend automatically creates the `swinhackathon_db` database and schema on startup
 
-Nếu muốn chạy nền:
+To run in detached mode:
 
 ```powershell
 docker compose up --build -d
 ```
 
-Dừng container:
+To stop containers:
 
 ```powershell
 docker compose down
 ```
 
-Xem log:
+To view logs:
 
 ```powershell
 docker compose logs -f backend
 docker compose logs -f sqlserver
 ```
 
-## Biến môi trường chính
+## Main Environment Variables
 
 Frontend:
 - `EXPO_PUBLIC_API_URL`
@@ -186,8 +186,8 @@ Backend SQL Server local:
 Docker SQL Server:
 - `SQLSERVER_SA_PASSWORD`
 
-## Lưu ý
+## Notes
 
-- `.env` bị ignore bởi Git, không push file này lên repo.
-- Dùng [`.env.example`](/d:/swin/swin2026/goalpilot/.env.example) làm mẫu chia sẻ cấu hình.
-- Nếu Dashboard không lên, kiểm tra backend trước ở `/docs` và `/api/dashboard`.
+- `.env` is ignored by Git. Do not commit it.
+- Use [`.env.example`](/d:/swin/swin2026/goalpilot/.env.example) as the shared configuration template.
+- If the dashboard does not load, check the backend first at `/docs` and `/api/dashboard`.

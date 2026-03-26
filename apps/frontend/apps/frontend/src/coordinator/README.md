@@ -1,30 +1,30 @@
 # Coordinator Layer
 
-Lớp trung gian giữa **Frontend** và **Backend API**.  
-FE **chỉ gọi qua coordinator**, không gọi `fetch` trực tiếp.
+The coordinator layer sits between the **Frontend** and the **Backend API**.
+The frontend should call the coordinator only, not `fetch` directly.
 
 ---
 
-## Cấu trúc
+## Structure
 
-```
+```text
 coordinator/
-├── README.md              ← file này
-├── types.ts               ← TypeScript interfaces cho toàn bộ API contract
-├── mockData.ts            ← Dữ liệu giả (dùng khi BE chưa sẵn sàng)
-├── dashboardCoordinator.ts  ← GET /api/dashboard
-├── goalCoordinator.ts       ← GET /api/goals/{id}/progress, POST /api/goals
-├── chatCoordinator.ts       ← POST /api/chat/message, GET /api/chat/session/{id}
-├── inputDataCoordinator.ts  ← POST /api/input-data
-├── cashFlowCoordinator.ts   ← GET /api/cashflow/weekly
-└── index.ts               ← Re-export tất cả (entry point duy nhất)
+|-- README.md                <- this file
+|-- types.ts                 <- TypeScript interfaces for the API contract
+|-- mockData.ts              <- Mock data used before the backend is fully connected
+|-- dashboardCoordinator.ts  <- GET /api/dashboard
+|-- goalCoordinator.ts       <- GET /api/goals/{id}/progress, POST /api/goals
+|-- chatCoordinator.ts       <- POST /api/chat/message, GET /api/chat/session/{id}
+|-- inputDataCoordinator.ts  <- POST /api/input-data
+|-- cashFlowCoordinator.ts   <- GET /api/cashflow/weekly
+`-- index.ts                 <- Single re-export entry point
 ```
 
 ---
 
-## Cách dùng
+## Usage
 
-Import từ `index.ts` — không import trực tiếp từ từng file:
+Import from `index.ts` instead of importing from each file directly:
 
 ```ts
 import {
@@ -35,16 +35,17 @@ import {
   getChatSession,
   postInputData,
   getCashFlow,
-} from '@/coordinator';                    // hoặc './coordinator'
+} from '@/coordinator';
 
 import type { GoalCard, DashboardResponse, CashFlowData } from '@/coordinator';
 ```
 
 ---
 
-## Ví dụ từng endpoint
+## Endpoint Examples
 
 ### GET /api/dashboard
+
 ```ts
 const res = await getDashboard();
 if (res.success) {
@@ -53,6 +54,7 @@ if (res.success) {
 ```
 
 ### GET /api/goals/{goal_id}/progress
+
 ```ts
 const res = await getGoalProgress('g001');
 if (res.success) {
@@ -61,41 +63,47 @@ if (res.success) {
 ```
 
 ### POST /api/chat/message
+
 ```ts
 const res = await postChatMessage({
   session_id: 's001',
-  message: 'Tôi muốn mua laptop 30 triệu',
+  message: 'I want to buy a laptop for 30 million',
   context: { active_goal_id: null, source_screen: 'dashboard' },
 });
+
 if (res.success) {
-  const { reply } = res.data; // reply.text, reply.actions
+  const { reply } = res.data;
 }
 ```
 
 ### GET /api/chat/session/{session_id}
+
 ```ts
 const res = await getChatSession('s001');
 if (res.success) {
-  const { messages } = res.data; // ChatMessage[]
+  const { messages } = res.data;
 }
 ```
 
 ### POST /api/goals
+
 ```ts
 const res = await createGoal({
   goal_name: 'Buy Laptop',
   goal_type: 'purchase',
   target_amount: 30_000_000,
   target_date: '2026-11-10',
-  currency: 'VND',
+  currency: 'USD',
   created_from: 'chat',
 });
+
 if (res.success) {
   const { goal_id } = res.data;
 }
 ```
 
 ### POST /api/input-data
+
 ```ts
 const res = await postInputData({
   source: 'manual',
@@ -104,59 +112,58 @@ const res = await postInputData({
     current_balance: 8_000_000,
   },
 });
+
 if (res.success && res.data.should_refresh_dashboard) {
-  // gọi lại getDashboard()
+  // call getDashboard() again
 }
 ```
 
 ### GET /api/cashflow/weekly
+
 ```ts
-// Lấy dữ liệu dòng tiền 7 ngày gần nhất (không lọc theo goal)
 const res = await getCashFlow();
 
-// Hoặc lọc theo goal cụ thể
-const res = await getCashFlow('g001');
+const filtered = await getCashFlow('g001');
 
 if (res.success) {
   const { period_start, period_end, points } = res.data;
-  // points: CashFlowPoint[] — mỷi phần tử có { date, income, expense, net }
 }
 ```
 
 ---
 
-## Trạng thái hiện tại: Mock Mode
+## Current State: Mock Mode
 
-Tất cả functions đang trả **mock data** từ `mockData.ts`.  
-Simulate network delay 300–600ms để FE test loading state.
+All coordinator functions currently return mock data from `mockData.ts`.
+They simulate a 300-600ms network delay so the frontend can test loading states.
 
-### Swap sang BE thật
+### Switching To Real Backend Calls
 
-Mỗi function có `TODO` comment chỉ rõ đoạn cần thay:
+Each function already includes a `TODO` comment showing where to replace the mock implementation with a real fetch call:
 
 ```ts
-// Ví dụ trong dashboardCoordinator.ts
-// TODO: swap sang fetch thật khi BE sẵn sàng:
+// Example in dashboardCoordinator.ts
+// TODO: swap to real fetch when BE is ready:
 //   const res = await fetch('/api/dashboard');
 //   return res.json();
 ```
 
-Khi BE sẵn sàng: uncomment fetch, xóa mock return — **FE không cần sửa gì**.
+Once the backend is ready, uncomment the real fetch call and remove the mock return. The frontend screens should not need structural changes.
 
 ---
 
-## Mock data có sẵn
+## Available Mock Data
 
 | ID | Goal | Status |
 |---|---|---|
-| `g001` | Buy Laptop | `at_risk` · 60% |
-| `g002` | Emergency Fund | `on_track` · 75% |
-| `g003` | Travel to Japan | `on_track` · 20% |
+| `g001` | Buy Laptop | `at_risk` - 60% |
+| `g002` | Emergency Fund | `on_track` - 75% |
+| `g003` | Travel to Japan | `on_track` - 20% |
 
-Session mặc định: `s001` — 2 messages (user + assistant có action `create_goal`).
+Default session: `s001` with two sample messages, including one assistant reply with a `create_goal` action.
 
 ---
 
-## API Contract tham khảo
+## Related Contract
 
-[`api_contract_dashboard_agent_mvp_detailed.md`](file:///d:/swin/swin2026/goalpilot/api_contract_dashboard_agent_mvp_detailed.md)
+See the detailed API contract in [api_contract_dashboard_agent_mvp_detailed.md](/d:/swin/swin2026/goalpilot/apps/frontend/docs/api-contract/api_contract_dashboard_agent_mvp_detailed.md).

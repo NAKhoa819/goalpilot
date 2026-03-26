@@ -5,6 +5,7 @@ from typing import Any
 from intelligence.llm_gateway import get_completion
 from intelligence.prompts import build_at_risk_chat_prompt
 from models.schemas import AtRiskProposalResponse
+from utils.currency import format_usd
 
 
 def _find_action(actions: list[dict], action_type: str) -> dict | None:
@@ -27,7 +28,7 @@ def _fallback_chat_text(goal: dict, actions: list[dict]) -> str:
         duration_months = payload.get("duration_months")
         duration_text = f" for the next {duration_months} months" if duration_months else ""
         parts.append(
-            f"Plan A helps if you can save an extra {amount:,} VND per month{duration_text}. "
+            f"Plan A helps if you can save an extra {format_usd(amount)} per month{duration_text}. "
             "Start with flexible spending like dining, shopping, or subscriptions."
         )
 
@@ -57,7 +58,7 @@ def _recommended_plan_text(goal: dict, action: dict) -> str:
         duration_text = f" for the next {duration_months} months" if duration_months else ""
         return (
             f"Your {goal_name} goal is currently at risk. "
-            f"GoalPilot selected Plan A from the intelligence score: save an extra {amount:,} VND per month"
+            f"GoalPilot selected Plan A from the intelligence score: save an extra {format_usd(amount)} per month"
             f"{duration_text}. Confirm this plan if you want me to apply it."
         )
 

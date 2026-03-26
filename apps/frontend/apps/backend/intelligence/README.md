@@ -1,3 +1,3 @@
 # Backend Intelligence
 
-Khung cho forecasting, reasoning, recommendation, và AI-related logic.
+Contains the backend intelligence layer for forecasting, reasoning, recommendation, and other AI-related logic.

@@ -16,6 +16,7 @@ from intelligence.market_prediction import (
     predict_car_price,
 )
 from models.schemas import CarPricePredictionRequest
+from utils.currency import from_usd_input, to_usd_display
 
 router = APIRouter()
 
@@ -28,8 +29,17 @@ def _error(message: str, error_code: str, status_code: int = 400):
 
 
 def _build_response(body: CarPricePredictionRequest):
+    normalized_body = CarPricePredictionRequest(
+        Present_Price=from_usd_input(body.Present_Price),
+        Kms_Driven=body.Kms_Driven,
+        Fuel_Type=body.Fuel_Type,
+        Seller_Type=body.Seller_Type,
+        Transmission=body.Transmission,
+        Owner=body.Owner,
+        Year=body.Year,
+    )
     try:
-        result = predict_car_price(body)
+        result = predict_car_price(normalized_body)
     except UnsupportedCategoryError as exc:
         return _error(str(exc), "INVALID_CATEGORY")
     except InvalidPredictionInputError as exc:
@@ -42,7 +52,7 @@ def _build_response(body: CarPricePredictionRequest):
     return {
         "success": True,
         "data": {
-            "predicted_price": result.predicted_price,
+            "predicted_price": to_usd_display(result.predicted_price),
             "raw_model_prediction": result.raw_prediction,
             "model_input": {
                 "present_price": body.Present_Price,
@@ -54,7 +64,7 @@ def _build_response(body: CarPricePredictionRequest):
                 "year": body.Year,
                 "car_age": result.car_age,
             },
-            "prediction_unit": "VND",
+            "prediction_unit": "USD",
             "feature_vector": result.feature_vector,
         },
     }

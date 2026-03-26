@@ -1,3 +1,3 @@
 # Frontend
 
-Khung cho mobile hoặc web frontend.
+Contains the mobile or web frontend application.

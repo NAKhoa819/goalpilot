@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from api import router_chat
+from utils.currency import usd_to_internal_from_text
 
 
 class FakeConversationHistory:
@@ -74,7 +75,9 @@ def test_chat_starts_car_goal_draft_from_regex_intent(monkeypatch):
     assert res.status_code == 200
     data = res.json()
     assert data["success"] is True
-    assert "price range" in data["data"]["reply"]["text"]
+    assert "used-car pricing model needs 7 inputs" in data["data"]["reply"]["text"]
+    assert "Present_Price" in data["data"]["reply"]["text"]
+    assert "original or new selling price in USD" in data["data"]["reply"]["text"]
     assert "actions" not in data["data"]["reply"]
 
     stored_state = session_state_store["car-flow-1"]
@@ -122,11 +125,41 @@ def test_chat_starts_car_goal_draft_from_llm_intent_with_deadline(monkeypatch):
 
     assert res.status_code == 200
     reply = res.json()["data"]["reply"]
-    assert "price range" in reply["text"]
+    assert "Present_Price" in reply["text"]
+    assert "original or new selling price in USD" in reply["text"]
 
     stored_state = session_state_store["car-flow-llm-2"]
     assert stored_state["flow_type"] == "car_goal_creation"
     assert stored_state["target_date"] == "2026-12-31"
+
+
+def test_chat_migrates_old_buy_car_pending_state_to_feature_questionnaire(monkeypatch):
+    client, session_state_store = _build_client(monkeypatch)
+    session_state_store["legacy-car-flow"] = {
+        "flow_type": "goal_creation_pending_fields",
+        "goal_name": "Buy Car",
+        "goal_type": "purchase",
+        "target_date": "2026-12-31",
+        "target_amount": None,
+    }
+
+    res = client.post(
+        "/api/chat/message",
+        json={
+            "session_id": "legacy-car-flow",
+            "message": "continue",
+            "context": {"source_screen": "agent"},
+        },
+    )
+
+    assert res.status_code == 200
+    reply = res.json()["data"]["reply"]
+    assert "used-car pricing model needs 7 inputs" in reply["text"]
+    assert "Present_Price" in reply["text"]
+
+    stored_state = session_state_store["legacy-car-flow"]
+    assert stored_state["flow_type"] == "car_goal_creation"
+    assert stored_state["pending_field"] == "Present_Price"
 
 
 def test_chat_car_goal_signal_does_not_fall_back_to_general_advice_when_llm_rejects(monkeypatch):
@@ -151,7 +184,7 @@ def test_chat_car_goal_signal_does_not_fall_back_to_general_advice_when_llm_reje
     assert res.status_code == 200
     reply = res.json()["data"]["reply"]
     assert "I can help with that" in reply["text"]
-    assert "deadline first" in reply["text"]
+    assert "Present_Price" in reply["text"]
     assert "actions" not in reply
     assert "car-flow-llm-3" not in session_state_store
 
@@ -167,13 +200,13 @@ def test_chat_collects_car_features_and_returns_create_goal_action(monkeypatch):
     session_id = "car-flow-2"
     messages = [
         "I want to buy a car before 2026-12-31",
-        "600000000",
-        "25000 km",
+        "25000",
+        "45000",
         "diesel",
         "individual",
         "automatic",
-        "0",
-        "2022",
+        "1",
+        "2020",
     ]
 
     last_response = None
@@ -191,11 +224,12 @@ def test_chat_collects_car_features_and_returns_create_goal_action(monkeypatch):
     assert reply["actions"][0]["payload"]["goal_name"] == "Buy Car"
     assert reply["actions"][0]["payload"]["target_amount"] == 456_000_000
     assert reply["actions"][0]["payload"]["target_date"] == "2026-12-31"
+    assert reply["actions"][0]["payload"]["currency"] == "USD"
     assert session_id not in session_state_store
 
 
-def test_chat_direct_goal_creation_still_works_when_amount_is_provided(monkeypatch):
-    client, _ = _build_client(monkeypatch)
+def test_car_goal_with_amount_in_initial_message_still_enters_questionnaire(monkeypatch):
+    client, session_state_store = _build_client(monkeypatch)
 
     res = client.post(
         "/api/chat/message",
@@ -207,11 +241,13 @@ def test_chat_direct_goal_creation_still_works_when_amount_is_provided(monkeypat
     )
 
     assert res.status_code == 200
-    data = res.json()
-    reply = data["data"]["reply"]
-    assert reply["actions"][0]["type"] == "create_goal"
-    assert reply["actions"][0]["payload"]["target_amount"] == 500_000_000
-    assert reply["actions"][0]["payload"]["target_date"] == "2026-11-01"
+    reply = res.json()["data"]["reply"]
+    assert "Present_Price" in reply["text"]
+    assert "Create Goal" not in reply["text"]
+
+    stored_state = session_state_store["car-flow-3"]
+    assert stored_state["flow_type"] == "car_goal_creation"
+    assert stored_state["target_date"] == "2026-11-01"
 
 
 def test_chat_asks_for_deadline_before_create_goal_when_missing(monkeypatch):
@@ -233,9 +269,9 @@ def test_chat_asks_for_deadline_before_create_goal_when_missing(monkeypatch):
     assert "actions" not in first_reply
 
     stored_state = session_state_store[session_id]
-    assert stored_state["flow_type"] == "goal_creation_pending_deadline"
+    assert stored_state["flow_type"] == "goal_creation_pending_fields"
     assert stored_state["goal_name"] == "Buy Laptop"
-    assert stored_state["target_amount"] == 30_000_000
+    assert stored_state["target_amount"] == usd_to_internal_from_text(30_000_000)
     assert stored_state["target_date"] is None
 
     second_res = client.post(
@@ -251,8 +287,9 @@ def test_chat_asks_for_deadline_before_create_goal_when_missing(monkeypatch):
     second_reply = second_res.json()["data"]["reply"]
     assert second_reply["actions"][0]["type"] == "create_goal"
     assert second_reply["actions"][0]["payload"]["goal_name"] == "Buy Laptop"
-    assert second_reply["actions"][0]["payload"]["target_amount"] == 30_000_000
+    assert second_reply["actions"][0]["payload"]["target_amount"] == usd_to_internal_from_text(30_000_000)
     assert second_reply["actions"][0]["payload"]["target_date"] == "2026-11-10"
+    assert second_reply["actions"][0]["payload"]["currency"] == "USD"
     assert session_id not in session_state_store
 
 
@@ -264,7 +301,7 @@ def test_extract_create_goal_payload_supports_accented_non_car_goal():
     assert payload is not None
     assert payload["goal_name"] == "Buy Dien Thoai"
     assert payload["goal_type"] == "purchase"
-    assert payload["target_amount"] == 20_000_000
+    assert payload["target_amount"] == usd_to_internal_from_text(20_000_000)
     assert payload["target_date"] == "2026-12-01"
 
 
@@ -276,7 +313,7 @@ def test_extract_create_goal_payload_supports_ty_unit_for_non_car_goal():
     assert payload is not None
     assert payload["goal_name"] == "Buy Nha"
     assert payload["goal_type"] == "purchase"
-    assert payload["target_amount"] == 2_000_000_000
+    assert payload["target_amount"] == usd_to_internal_from_text(2_000_000_000)
     assert payload["target_date"] == "2030-01-01"
 
 
@@ -287,7 +324,7 @@ def test_extract_create_goal_payload_supports_cu_unit():
 
     assert payload is not None
     assert payload["goal_name"] == "Buy Laptop"
-    assert payload["target_amount"] == 30_000_000
+    assert payload["target_amount"] == usd_to_internal_from_text(30_000_000)
     assert payload["target_date"] == "2026-11-10"
 
 
@@ -298,7 +335,7 @@ def test_extract_create_goal_payload_supports_unicode_vietnamese():
 
     assert payload is not None
     assert payload["goal_name"] == "Buy Dien Thoai"
-    assert payload["target_amount"] == 20_000_000
+    assert payload["target_amount"] == usd_to_internal_from_text(20_000_000)
     assert payload["target_date"] == "2026-12-01"
 
 
@@ -310,5 +347,5 @@ def test_extract_create_goal_payload_supports_english_goal_creation():
     assert payload is not None
     assert payload["goal_name"] == "Buy Phone"
     assert payload["goal_type"] == "purchase"
-    assert payload["target_amount"] == 20_000_000
+    assert payload["target_amount"] == usd_to_internal_from_text(20_000_000)
     assert payload["target_date"] == "2026-12-01"

@@ -1,28 +1,26 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  NativeSyntheticEvent,
   NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import {
-  CheckCircle2,
-  AlertTriangle,
-  Star,
-  PauseCircle,
-} from 'lucide-react-native';
+import { CheckCircle2, AlertTriangle, PauseCircle, Star } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GoalCard } from '../../coordinator/types';
-import { COLORS, GOAL_GRADIENTS } from '../../theme';
-import styles, { CARD_WIDTH, CARD_MARGIN } from './styles';
+import { GOAL_GRADIENTS } from '../../theme';
+import { formatCompactUsd } from '../../utils/currency';
+import styles, { CARD_MARGIN, CARD_WIDTH } from './styles';
 
-// ─── Status Config ─────────────────────────────────────────────
-const STATUS_CONFIG: Record<string, {
-  label: string;
-  Icon: React.ComponentType<{ size: number; color: string; strokeWidth: number }>;
-}> = {
+const STATUS_CONFIG: Record<
+  string,
+  {
+    label: string;
+    Icon: React.ComponentType<{ size: number; color: string; strokeWidth: number }>;
+  }
+> = {
   on_track: {
     label: 'On Track',
     Icon: CheckCircle2,
@@ -41,12 +39,11 @@ const STATUS_CONFIG: Record<string, {
   },
 };
 
-// ─── Format helpers ────────────────────────────────────────────────────────────
-const fmtVND = (n: number) =>
-  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : `${(n / 1_000).toFixed(0)}K`;
-const fmtDate = (d: string) => { const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y}`; };
+const fmtDate = (d: string) => {
+  const [y, m, dd] = d.split('-');
+  return `${dd}/${m}/${y}`;
+};
 
-// ─── Single Goal Card ─────────────────────────────────────────────────────────
 interface GoalCardItemProps {
   goal: GoalCard;
   index: number;
@@ -57,17 +54,14 @@ interface GoalCardItemProps {
 const GoalCardItem: React.FC<GoalCardItemProps> = ({ goal, index, isActive, onPress }) => {
   const cfg = STATUS_CONFIG[goal.status] ?? STATUS_CONFIG.on_track;
   const remaining = goal.target_amount - goal.current_saved;
-  const pct = Math.min(100, goal.current_saved / goal.target_amount * 100);
+  const pct = Math.min(100, (goal.current_saved / goal.target_amount) * 100);
   const { Icon } = cfg;
 
   return (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={onPress}
-      style={[
-        styles.cardWrapper,
-        isActive && styles.cardActive,
-      ]}
+      style={[styles.cardWrapper, isActive && styles.cardActive]}
     >
       <LinearGradient
         colors={GOAL_GRADIENTS[index % GOAL_GRADIENTS.length] as [string, string, ...string[]]}
@@ -75,38 +69,35 @@ const GoalCardItem: React.FC<GoalCardItemProps> = ({ goal, index, isActive, onPr
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        {/* Header row */}
         <View style={styles.cardHeader}>
-          <Text style={styles.goalName} numberOfLines={1}>{goal.goal_name}</Text>
+          <Text style={styles.goalName} numberOfLines={1}>
+            {goal.goal_name}
+          </Text>
           <View style={styles.statusBadge}>
             <Icon size={12} color="#000000" strokeWidth={2.5} />
             <Text style={styles.statusText}>{cfg.label}</Text>
           </View>
         </View>
 
-        {/* Amounts */}
         <View style={styles.amountsRow}>
           <View style={styles.amountBlock}>
             <Text style={styles.amountLabel}>Saved</Text>
-            <Text style={styles.amountValue}>{fmtVND(goal.current_saved)} ₫</Text>
+            <Text style={styles.amountValue}>{formatCompactUsd(goal.current_saved)}</Text>
           </View>
           <View style={styles.amountDivider} />
           <View style={styles.amountBlock}>
             <Text style={styles.amountLabel}>Target</Text>
-            <Text style={styles.amountValue}>{fmtVND(goal.target_amount)} ₫</Text>
+            <Text style={styles.amountValue}>{formatCompactUsd(goal.target_amount)}</Text>
           </View>
           <View style={styles.amountDivider} />
           <View style={styles.amountBlock}>
             <Text style={styles.amountLabel}>Remaining</Text>
-            <Text style={styles.amountValue}>{fmtVND(remaining)} ₫</Text>
+            <Text style={styles.amountValue}>{formatCompactUsd(remaining)}</Text>
           </View>
         </View>
 
-        {/* Progress bar — solid fill */}
         <View style={styles.progressBarBg}>
-          <View
-            style={[styles.progressBarFill, { width: `${pct}%` }]}
-          />
+          <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
         </View>
         <View style={styles.progressLabelRow}>
           <Text style={styles.progressPct}>{pct.toFixed(0)}% saved</Text>
@@ -117,7 +108,6 @@ const GoalCardItem: React.FC<GoalCardItemProps> = ({ goal, index, isActive, onPr
   );
 };
 
-// ─── GoalSlider ───────────────────────────────────────────────────────────────
 interface GoalSliderProps {
   goals: GoalCard[];
   activeGoalId: string;
@@ -133,12 +123,15 @@ const GoalSlider: React.FC<GoalSliderProps> = ({ goals, activeGoalId, onSelectGo
     scrollRef.current?.scrollTo({ x, animated: true });
   }, []);
 
-  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const x = e.nativeEvent.contentOffset.x;
-    const step = CARD_WIDTH + CARD_MARGIN * 2;
-    const idx = Math.round(x / step);
-    if (idx !== activeDotIndex) setActiveDotIndex(idx);
-  }, [activeDotIndex]);
+  const handleScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const x = e.nativeEvent.contentOffset.x;
+      const step = CARD_WIDTH + CARD_MARGIN * 2;
+      const idx = Math.round(x / step);
+      if (idx !== activeDotIndex) setActiveDotIndex(idx);
+    },
+    [activeDotIndex],
+  );
 
   if (!goals || goals.length === 0) return null;
 
@@ -161,7 +154,7 @@ const GoalSlider: React.FC<GoalSliderProps> = ({ goals, activeGoalId, onSelectGo
             key={goal.goal_id}
             goal={goal}
             index={index}
-            isActive={index === activeDotIndex}
+            isActive={goal.goal_id === activeGoalId || index === activeDotIndex}
             onPress={() => {
               scrollToIndex(index);
               onSelectGoal(goal.goal_id);
@@ -170,7 +163,6 @@ const GoalSlider: React.FC<GoalSliderProps> = ({ goals, activeGoalId, onSelectGo
         ))}
       </ScrollView>
 
-      {/* Pagination dots */}
       <View style={styles.dots}>
         {goals.map((_, i) => (
           <TouchableOpacity key={i} onPress={() => scrollToIndex(i)}>

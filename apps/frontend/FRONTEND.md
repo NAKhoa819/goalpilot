@@ -1,60 +1,98 @@
-PROJECT DOCUMENTATION: AI FINANCIAL ASSISTANT (FRONTEND MVP)
-1. YÊU CẦU MÔI TRƯỜNG
-Node.js (khuyến nghị v18 trở lên)
+# Frontend MVP Documentation
 
-Expo CLI
+## Environment Requirements
 
-App Expo Go (trên điện thoại) hoặc Simulator/Emulator (Android/iOS)
+- Node.js 18+ recommended
+- Expo CLI
+- Expo Go on a physical device, or an Android/iOS simulator
 
-2. LỆNH TERMINAL KHỞI CHẠY
-Mở terminal tại thư mục gốc của dự án và chạy các lệnh sau:
+## Run Commands
 
-Bash
-# 1. Cài đặt các package phụ thuộc (bao gồm liquid-glass, lucide-react-native...)
+Open a terminal in the frontend project and run:
+
+```bash
+# 1. Install dependencies
 npm install
 
-# 2. Khởi chạy server Expo
+# 2. Start the Expo server
 npx expo start
 
-# 3. Xóa cache nếu gặp lỗi UI hoặc lỗi thư viện không nhận
+# 3. Clear cache if you hit UI or dependency issues
 npx expo start -c
-3. CẤU TRÚC THƯ MỤC CHÍNH
-Dự án được viết bằng React Native (Expo) + TypeScript. Dưới đây là các file quan trọng nhất cần nắm:
+```
 
-Plaintext
+## Main Project Structure
+
+The frontend is built with React Native (Expo) and TypeScript.
+
+```text
 src/
-├── components/
-│   ├── ActionButtons/      # Component render các nút bấm Neon (Plan A, Plan B, Accept...)
-│   ├── ChatBubble/         # Bong bóng chat của User (Gradient) và AI (Dark/Glass)
-│   └── FinancialChart/     # Biểu đồ dòng tiền (Cash Flow) với hiệu ứng Liquid Glass
-├── screens/
-│   ├── AgentScreen/        # Màn hình chính (Phòng chat AI) chứa input, list message
-│   └── DashboardScreen/    # Màn hình tổng quan (chứa biểu đồ và thẻ Goal)
-├── coordinator/
-│   ├── types.ts            # (QUAN TRỌNG) Định nghĩa API Contract / TypeScript Interfaces
-│   ├── mockData.ts         # Dữ liệu giả lập (Lịch sử chat, kịch bản Replan, Cash flow)
-│   └── chatCoordinator.ts  # Các hàm xử lý logic và chuẩn bị bắn data lên BE
-└── theme.ts                # File định nghĩa biến màu Neon, Gradient, Background
-4. LUỒNG DATA
-A. Luồng tải lịch sử Chat
-File: chatCoordinator.ts -> Hàm getChatSession(sessionId)
+|-- components/
+|   |-- ActionButtons/    # Neon action buttons such as Plan A, Plan B, Accept
+|   |-- ChatBubble/       # User and assistant chat bubbles
+|   `-- FinancialChart/   # Cash flow chart with liquid-glass styling
+|-- screens/
+|   |-- AgentScreen/      # Main AI chat screen
+|   `-- DashboardScreen/  # Overview screen with chart and goal cards
+|-- coordinator/
+|   |-- types.ts          # Important API contract interfaces
+|   |-- mockData.ts       # Mock chat, replan, and cash flow data
+|   `-- chatCoordinator.ts
+`-- theme.ts              # Colors, gradients, and shared visual tokens
+```
 
-Hiện tại: Đang return dữ liệu tĩnh từ mockData.ts.
+## Data Flow
 
-Nhiệm vụ BE: Đổi thành lệnh fetch(GET /api/chat/session).
+### A. Load Chat History
 
-B. Luồng gửi tin nhắn text
-File: chatCoordinator.ts -> Hàm postChatMessage(payload)
+File: `chatCoordinator.ts`
+Function: `getChatSession(sessionId)`
 
-Hiện tại: Nhận text của user, delay 600ms và nhả ra câu trả lời giả lập.
+Current state:
+- Returns static data from `mockData.ts`
 
-Nhiệm vụ BE: Đổi thành fetch(POST /api/chat/message, body: payload).
+Backend integration target:
+- Replace with `GET /api/chat/session`
 
-C. Luồng bấm nút Action (Plan A, Plan B, Accept, Create Goal)
-File: chatCoordinator.ts -> Hàm handleActionSelection(action: ChatAction)
+### B. Send Text Messages
 
-Cơ chế: Khi user bấm nút, UI không chỉ truyền ID mà truyền toàn bộ object action (bao gồm type và payload data chi tiết).
+File: `chatCoordinator.ts`
+Function: `postChatMessage(payload)`
 
-Hiện tại: Hàm đang chạy console.log('[API BINDING] Bắn lên BE:', action.type, action.payload);
+Current state:
+- Accepts user text
+- waits about 600ms
+- returns a mock assistant reply
 
-Nhiệm vụ BE: Dùng dữ liệu action.payload (ví dụ: { strategy: 'increase_savings', amount: 3000000 }) để bắn thẳng vào body của API điều chỉnh Goal:
+Backend integration target:
+- Replace with `POST /api/chat/message`
+
+### C. Handle Action Buttons
+
+File: `chatCoordinator.ts`
+Function: `handleActionSelection(action: ChatAction)`
+
+Behavior:
+- The UI passes the full action object, not only an ID
+- The action includes both `type` and detailed `payload`
+
+Current state:
+- Logs the outgoing payload with `console.log`
+
+Backend integration target:
+- Send `action.payload` directly to the related goal-adjustment API
+
+Example payload:
+
+```ts
+{
+  strategy: 'increase_savings',
+  amount: 3000000
+}
+```
+
+## Notes
+
+- The frontend currently supports mock mode for backend-independent UI work.
+- The coordinator layer is the intended integration boundary.
+- Once backend APIs are ready, swap the mock coordinator implementations for real network calls.
